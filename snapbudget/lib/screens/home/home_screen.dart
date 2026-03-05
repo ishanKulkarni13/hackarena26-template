@@ -6,6 +6,7 @@ import '../../models/transaction_model.dart';
 import '../transactions/transactions_screen.dart';
 import '../scan/scan_screen.dart';
 import '../splitsync/splitsync_screen.dart';
+import '../notifications/notifications_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   /// Optional callback to switch the bottom-nav tab from within HomeScreen.
@@ -135,19 +136,35 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           Row(
             children: [
-              _buildIconBtn(Icons.notifications_rounded, hasBadge: true),
-              const SizedBox(width: 10),
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  gradient: AppTheme.primaryGradient,
-                  shape: BoxShape.circle,
+              GestureDetector(
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const NotificationsScreen(),
+                  ),
                 ),
-                child: const Icon(
-                  Icons.person_rounded,
-                  color: Colors.white,
-                  size: 20,
+                child:
+                    _buildIconBtn(Icons.notifications_rounded, hasBadge: true),
+              ),
+              const SizedBox(width: 10),
+              GestureDetector(
+                onTap: () {
+                  if (widget.onTabChange != null) {
+                    widget.onTabChange!(4); // Profile tab
+                  }
+                },
+                child: Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    gradient: AppTheme.primaryGradient,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.person_rounded,
+                    color: Colors.white,
+                    size: 20,
+                  ),
                 ),
               ),
             ],
@@ -353,19 +370,16 @@ class _HomeScreenState extends State<HomeScreen> {
           Row(
             children: [
               Expanded(
-                child: _buildPrimaryActionItem(
+                child: _buildSecondaryActionItem(
                   'Scan\nReceipt',
                   Icons.document_scanner_rounded,
-                  () {
-                    if (widget.onTabChange != null) {
-                      widget.onTabChange!(2); // Scan tab
-                    } else {
-                      Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (_) => const ScanScreen()));
-                    }
-                  },
+                  AppTheme.primaryPurple,
+                  () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const ScanScreen(initialMode: 0),
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(width: 8),
@@ -374,16 +388,12 @@ class _HomeScreenState extends State<HomeScreen> {
                   'Voice',
                   Icons.mic_rounded,
                   AppTheme.primaryPurple,
-                  () {
-                    if (widget.onTabChange != null) {
-                      widget.onTabChange!(2); // Scan tab (voice mode)
-                    } else {
-                      Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (_) => const ScanScreen()));
-                    }
-                  },
+                  () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const ScanScreen(initialMode: 2),
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(width: 8),
@@ -420,52 +430,6 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildPrimaryActionItem(
-      String label, IconData icon, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        height: 105,
-        decoration: BoxDecoration(
-          color: AppTheme.primaryPurple,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: AppTheme.primaryPurple.withOpacity(0.3),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white.withOpacity(0.2),
-              ),
-              child: Icon(icon, color: Colors.white, size: 20),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              label,
-              textAlign: TextAlign.center,
-              style: GoogleFonts.inter(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: Colors.white,
-                height: 1.2,
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

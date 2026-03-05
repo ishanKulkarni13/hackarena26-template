@@ -3,7 +3,8 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../theme/app_theme.dart';
 
 class ScanScreen extends StatefulWidget {
-  const ScanScreen({super.key});
+  final int initialMode;
+  const ScanScreen({super.key, this.initialMode = 0});
 
   @override
   State<ScanScreen> createState() => _ScanScreenState();
@@ -25,6 +26,7 @@ class _ScanScreenState extends State<ScanScreen>
   @override
   void initState() {
     super.initState();
+    _selectedMode = widget.initialMode;
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 2),
