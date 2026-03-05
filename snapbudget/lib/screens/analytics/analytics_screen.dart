@@ -19,13 +19,88 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   int _selectedPeriod = 1; // 0=Week, 1=Month, 2=Year
   final List<String> _periods = ['Week', 'Month', 'Year'];
 
-  List<_CategoryStat> _calculateCategoryStats(TransactionProvider provider) {
-    if (provider.transactions.isEmpty) return [];
+  /// Filters transactions based on selected period
+  List<Transaction> _getFilteredTransactions(
+      List<Transaction> allTransactions, int periodIndex) {
+    final now = DateTime.now();
+    DateTime startDate;
+
+    switch (periodIndex) {
+      case 0: // Week
+        startDate = now.subtract(Duration(days: now.weekday - 1));
+        break;
+      case 1: // Month
+        startDate = DateTime(now.year, now.month, 1);
+        break;
+      case 2: // Year
+        startDate = DateTime(now.year, 1, 1);
+        break;
+      default:
+        startDate = DateTime(now.year, now.month, 1);
+    }
+
+    return allTransactions.where((tx) => tx.date.isAfter(startDate)).toList();
+  }
+
+  /// Generates daily spending data for the bar chart
+  Map<int, double> _generateDailySpendingData(
+      List<Transaction> transactions, int periodIndex) {
+    final data = <int, double>{};
+    final now = DateTime.now();
+
+    if (periodIndex == 0) {
+      // Week: 7 days
+      for (int i = 0; i < 7; i++) {
+        data[i] = 0;
+      }
+      for (var tx in transactions) {
+        if (tx.type == TransactionType.expense) {
+          final dayOfWeek = tx.date.weekday - 1; // 0 = Monday
+          if (dayOfWeek >= 0 && dayOfWeek < 7) {
+            data[dayOfWeek] = (data[dayOfWeek] ?? 0) + tx.amount;
+          }
+        }
+      }
+    } else if (periodIndex == 1) {
+      // Month: days in current month
+      final daysInMonth = DateTime(now.year, now.month + 1, 0).day;
+      for (int i = 1; i <= daysInMonth; i++) {
+        data[i - 1] = 0;
+      }
+      for (var tx in transactions) {
+        if (tx.type == TransactionType.expense) {
+          final day = tx.date.day - 1;
+          if (day >= 0 && day < daysInMonth) {
+            data[day] = (data[day] ?? 0) + tx.amount;
+          }
+        }
+      }
+    } else {
+      // Year: 12 months
+      for (int i = 0; i < 12; i++) {
+        data[i] = 0;
+      }
+      for (var tx in transactions) {
+        if (tx.type == TransactionType.expense) {
+          final month = tx.date.month - 1;
+          if (month >= 0 && month < 12) {
+            data[month] = (data[month] ?? 0) + tx.amount;
+          }
+        }
+      }
+    }
+
+    return data;
+  }
+
+  List<_CategoryStat> _calculateCategoryStats(
+      List<Transaction> filteredTransactions) {
+    if (filteredTransactions.isEmpty) return [];
 
     final Map<TransactionCategory, double> totals = {};
     double grandTotal = 0;
 
-    for (var tx in provider.transactions) {
+    for (var tx in filteredTransactions) {
       if (tx.type == TransactionType.expense) {
         totals[tx.category] = (totals[tx.category] ?? 0) + tx.amount;
         grandTotal += tx.amount;
@@ -55,23 +130,49 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       case TransactionCategory.utilities:
         return AppTheme.successGreen;
       case TransactionCategory.health:
-        return AppTheme.errorRed;
+        return const Color(0xFFEC4899);
       case TransactionCategory.education:
         return AppTheme.accentBlue;
+      case TransactionCategory.housing:
+        return const Color(0xFF8B5CF6);
+      case TransactionCategory.travel:
+        return const Color(0xFF06B6D4);
+      case TransactionCategory.salary:
+        return const Color(0xFF10B981);
+      case TransactionCategory.freelance:
+        return const Color(0xFF6366F1);
+      case TransactionCategory.investment:
+        return const Color(0xFFF59E0B);
       case TransactionCategory.other:
         return AppTheme.textLight;
-      default:
-        return AppTheme.textMedium;
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final txProvider = context.watch<TransactionProvider>();
-    final categories = _calculateCategoryStats(txProvider);
-    final totalSpent = txProvider.totalExpense;
+
+    // Filter transactions based on selected period
+    final filteredTransactions =
+        _getFilteredTransactions(txProvider.transactions, _selectedPeriod);
+
+    final categories = _calculateCategoryStats(filteredTransactions);
+
+    // Calculate total spent from filtered transactions
+    final totalSpent = filteredTransactions
+        .where((t) => t.type == TransactionType.expense)
+        .fold(0.0, (sum, t) => sum + t.amount);
+
+    // Generate daily spending data
+    final dailyData = _generateDailySpendingData(filteredTransactions, _selectedPeriod);
+
     final currencyFormat =
         NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
+
+    // Get max value for chart scaling
+    final maxValue = dailyData.values.isNotEmpty
+        ? dailyData.values.reduce((a, b) => a > b ? a : b)
+        : 10000;
 
     return Scaffold(
       backgroundColor: AppTheme.background,
@@ -176,7 +277,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                                   color: Colors.white,
                                   letterSpacing: -1)),
                           const SizedBox(height: 6),
-                          if (totalSpent > 0)
+                          if (filteredTransactions.isNotEmpty)
                             Row(children: [
                               Container(
                                 padding: const EdgeInsets.symmetric(
@@ -190,7 +291,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                                       color: Colors.greenAccent, size: 14),
                                   const SizedBox(width: 4),
                                   Text(
-                                      'Analysis based on ${txProvider.transactions.length} transactions',
+                                      'Analysis based on ${filteredTransactions.length} transactions',
                                       style: GoogleFonts.inter(
                                           fontSize: 11,
                                           color: Colors.greenAccent,
@@ -228,27 +329,31 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                           boxShadow: AppTheme.cardShadow),
                       child: SizedBox(
                         height: 180,
-                        child: BarChart(
-                          BarChartData(
-                            alignment: BarChartAlignment.spaceAround,
-                            maxY: totalSpent > 0 ? totalSpent * 1.2 : 10000,
-                            barTouchData: BarTouchData(enabled: false),
-                            titlesData: const FlTitlesData(
-                              show: false,
-                            ),
-                            gridData: const FlGridData(show: false),
-                            borderData: FlBorderData(show: false),
-                            barGroups: [
-                              _bar(0, totalSpent * 0.4, false),
-                              _bar(1, totalSpent * 0.6, false),
-                              _bar(2, totalSpent * 0.3, false),
-                              _bar(3, totalSpent * 0.8, false),
-                              _bar(4, totalSpent * 0.5, false),
-                              _bar(5, totalSpent * 0.7, false),
-                              _bar(6, totalSpent, true),
-                            ],
-                          ),
-                        ),
+                        child: dailyData.isEmpty
+                            ? Center(
+                                child: Text('No data available',
+                                    style: GoogleFonts.inter(
+                                        color: AppTheme.textLight)))
+                            : BarChart(
+                                BarChartData(
+                                  alignment: BarChartAlignment.spaceAround,
+                                  maxY: maxValue > 0 ? maxValue * 1.2 : 10000,
+                                  barTouchData: BarTouchData(enabled: false),
+                                  titlesData: const FlTitlesData(
+                                    show: false,
+                                  ),
+                                  gridData: const FlGridData(show: false),
+                                  borderData: FlBorderData(show: false),
+                                  barGroups: List.generate(
+                                    dailyData.length,
+                                    (i) => _bar(
+                                      i,
+                                      dailyData[i] ?? 0,
+                                      i == dailyData.length - 1,
+                                    ),
+                                  ),
+                                ),
+                              ),
                       ),
                     ),
                   ]),

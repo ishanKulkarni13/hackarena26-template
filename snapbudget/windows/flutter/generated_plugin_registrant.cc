@@ -12,7 +12,12 @@
 #include <firebase_core/firebase_core_plugin_c_api.h>
 #include <firebase_storage/firebase_storage_plugin_c_api.h>
 #include <permission_handler_windows/permission_handler_windows_plugin.h>
+<<<<<<< HEAD
 #include <speech_to_text_windows/speech_to_text_windows.h>
+=======
+#include <share_plus/share_plus_windows_plugin_c_api.h>
+#include <url_launcher_windows/url_launcher_windows.h>
+>>>>>>> 4a1dfc0fb108d79419c74c610fd5c583fea8f38f
 
 void RegisterPlugins(flutter::PluginRegistry* registry) {
   CloudFirestorePluginCApiRegisterWithRegistrar(
@@ -27,6 +32,13 @@ void RegisterPlugins(flutter::PluginRegistry* registry) {
       registry->GetRegistrarForPlugin("FirebaseStoragePluginCApi"));
   PermissionHandlerWindowsPluginRegisterWithRegistrar(
       registry->GetRegistrarForPlugin("PermissionHandlerWindowsPlugin"));
+<<<<<<< HEAD
   SpeechToTextWindowsRegisterWithRegistrar(
       registry->GetRegistrarForPlugin("SpeechToTextWindows"));
+=======
+  SharePlusWindowsPluginCApiRegisterWithRegistrar(
+      registry->GetRegistrarForPlugin("SharePlusWindowsPluginCApi"));
+  UrlLauncherWindowsRegisterWithRegistrar(
+      registry->GetRegistrarForPlugin("UrlLauncherWindows"));
+>>>>>>> 4a1dfc0fb108d79419c74c610fd5c583fea8f38f
 }
