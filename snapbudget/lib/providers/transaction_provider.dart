@@ -21,6 +21,8 @@ class TransactionProvider extends ChangeNotifier {
       .where((t) => t.type == TransactionType.expense)
       .fold(0, (sum, t) => sum + t.amount);
 
+  double get totalBalance => totalIncome - totalExpense;
+
   void loadTransactions(String userId) {
     _setLoading(true);
     _subscription?.cancel();
@@ -31,10 +33,23 @@ class TransactionProvider extends ChangeNotifier {
         _setLoading(false);
       },
       onError: (e) {
-        print('Error loading transactions: $e');
+        debugPrint('Error loading transactions: $e');
         _setLoading(false);
       },
     );
+  }
+
+  Future<void> refreshTransactions(String userId) async {
+    loadTransactions(userId);
+    // Wait for the first data emission or timeout after 5 seconds
+    try {
+      await _firestoreService
+          .getTransactions(userId)
+          .first
+          .timeout(const Duration(seconds: 5));
+    } catch (_) {
+      // Ignore timeout or other errors for the refresh spinner
+    }
   }
 
   Future<void> addTransaction(Transaction tx) async {

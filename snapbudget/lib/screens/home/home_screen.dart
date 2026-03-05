@@ -6,8 +6,9 @@ import '../../theme/app_theme.dart';
 import '../../models/transaction_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/transaction_provider.dart';
-import '../transactions/transactions_screen.dart';
 import '../scan/scan_screen.dart';
+import '../transactions/transactions_screen.dart';
+import '../transactions/add_transaction_sheet.dart';
 import '../splitsync/splitsync_screen.dart';
 import '../notifications/notifications_screen.dart';
 import '../../widgets/transaction_details_sheet.dart';
@@ -36,6 +37,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final auth = context.watch<AuthProvider>();
+    final transactionProvider = context.watch<TransactionProvider>();
+
     final currencyFormat = NumberFormat.currency(
       locale: 'en_IN',
       symbol: '₹',
@@ -45,92 +49,108 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Scaffold(
       backgroundColor: AppTheme.background,
-      body: CustomScrollView(
-        slivers: [
-          SliverToBoxAdapter(child: _buildHeader()),
-          SliverToBoxAdapter(child: _buildBalanceCard(currencyFormat)),
-          SliverToBoxAdapter(child: _buildQuickActions()),
-          SliverToBoxAdapter(child: _buildAIInsightCard()),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Recent Transactions',
-                    style: GoogleFonts.inter(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w700,
-                      color: AppTheme.textDark,
-                    ),
-                  ),
-                  GestureDetector(
-                    onTap: () {
-                      if (widget.onTabChange != null) {
-                        widget.onTabChange!(3); // Transactions tab
-                      } else {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (_) => const TransactionsScreen()),
-                        );
-                      }
-                    },
-                    child: Text(
-                      'See all',
+      body: RefreshIndicator(
+        onRefresh: () async {
+          if (auth.isAuthenticated) {
+            await transactionProvider.refreshTransactions(auth.user!.uid);
+          }
+        },
+        color: AppTheme.primaryPurple,
+        backgroundColor: Colors.white,
+        displacement: 40,
+        child: CustomScrollView(
+          physics:
+              const AlwaysScrollableScrollPhysics(), // Important for RefreshIndicator
+          slivers: [
+            SliverToBoxAdapter(child: _buildHeader(auth.user)),
+            SliverToBoxAdapter(
+                child: _buildBalanceCard(currencyFormat, transactionProvider)),
+            SliverToBoxAdapter(child: _buildQuickActions()),
+            SliverToBoxAdapter(child: _buildAIInsightCard()),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Recent Transactions',
                       style: GoogleFonts.inter(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: AppTheme.primaryPurple,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.textDark,
                       ),
                     ),
-                  ),
-                ],
+                    GestureDetector(
+                      onTap: () {
+                        if (widget.onTabChange != null) {
+                          widget.onTabChange!(3); // Transactions tab
+                        } else {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (_) => const TransactionsScreen()),
+                          );
+                        }
+                      },
+                      child: Text(
+                        'See all',
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.primaryPurple,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
-          Consumer<TransactionProvider>(
-            builder: (context, provider, child) {
-              if (provider.isLoading && provider.transactions.isEmpty) {
-                return const SliverToBoxAdapter(
-                    child: Center(child: CircularProgressIndicator()));
-              }
+            Consumer<TransactionProvider>(
+              builder: (context, provider, child) {
+                if (provider.isLoading && provider.transactions.isEmpty) {
+                  return const SliverToBoxAdapter(
+                      child: Center(child: CircularProgressIndicator()));
+                }
 
-              final transactions = provider.transactions.take(5).toList();
+                final transactions = provider.transactions.take(5).toList();
 
-              if (transactions.isEmpty) {
-                return SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 20),
-                    child: Center(
-                      child: Text(
-                        'No transactions found',
-                        style: GoogleFonts.inter(color: AppTheme.textLight),
+                if (transactions.isEmpty) {
+                  return SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 20),
+                      child: Center(
+                        child: Text(
+                          'No transactions found',
+                          style: GoogleFonts.inter(color: AppTheme.textLight),
+                        ),
                       ),
                     ),
+                  );
+                }
+
+                return SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) {
+                      final tx = transactions[index];
+                      return _buildTransactionItem(context, tx, currencyFormat);
+                    },
+                    childCount: transactions.length,
                   ),
                 );
-              }
-
-              return SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) {
-                    final tx = transactions[index];
-                    return _buildTransactionItem(context, tx, currencyFormat);
-                  },
-                  childCount: transactions.length,
-                ),
-              );
-            },
-          ),
-          SliverToBoxAdapter(child: SizedBox(height: bottomInset)),
-        ],
+              },
+            ),
+            SliverToBoxAdapter(child: SizedBox(height: bottomInset)),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(dynamic user) {
+    final displayName =
+        user?.displayName ?? user?.email?.split('@')[0] ?? 'User';
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 56, 24, 0),
       child: Row(
@@ -148,7 +168,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               const SizedBox(height: 2),
               Text(
-                'Rahul 👋',
+                '$displayName 👋',
                 style: GoogleFonts.inter(
                   fontSize: 22,
                   fontWeight: FontWeight.w700,
@@ -228,7 +248,9 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildBalanceCard(NumberFormat fmt) {
+  Widget _buildBalanceCard(NumberFormat fmt, TransactionProvider provider) {
+    final monthName = DateFormat('MMMM yyyy').format(DateTime.now());
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
       child: Container(
@@ -295,7 +317,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(
-                          'March 2026',
+                          monthName,
                           style: GoogleFonts.inter(
                             fontSize: 11,
                             fontWeight: FontWeight.w500,
@@ -307,7 +329,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    '₹1,24,580',
+                    fmt.format(provider.totalBalance),
                     style: GoogleFonts.inter(
                       fontSize: 36,
                       fontWeight: FontWeight.w800,
@@ -318,12 +340,15 @@ class _HomeScreenState extends State<HomeScreen> {
                   const SizedBox(height: 24),
                   Row(
                     children: [
-                      _buildBalanceStat('Income', '₹65,000',
-                          Icons.arrow_upward_rounded, Colors.greenAccent),
+                      _buildBalanceStat(
+                          'Income',
+                          fmt.format(provider.totalIncome),
+                          Icons.arrow_upward_rounded,
+                          Colors.greenAccent),
                       const SizedBox(width: 24),
                       _buildBalanceStat(
                           'Expenses',
-                          '₹12,420',
+                          fmt.format(provider.totalExpense),
                           Icons.arrow_downward_rounded,
                           Colors.redAccent.shade100),
                     ],
@@ -425,11 +450,37 @@ class _HomeScreenState extends State<HomeScreen> {
                   'Manual',
                   Icons.edit_rounded,
                   const Color(0xFFF59E0B),
-                  () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (_) => const TransactionsScreen()),
-                  ),
+                  () {
+                    final auth = context.read<AuthProvider>();
+                    if (!auth.isAuthenticated) return;
+
+                    showModalBottomSheet(
+                      context: context,
+                      isScrollControlled: true,
+                      backgroundColor: Colors.transparent,
+                      builder: (ctx) => AddTransactionSheet(
+                        userId: auth.user!.uid,
+                        onSave: (tx) {
+                          context
+                              .read<TransactionProvider>()
+                              .addTransaction(tx);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                '${tx.title} added successfully! 💸',
+                                style: GoogleFonts.inter(color: Colors.white),
+                              ),
+                              backgroundColor: AppTheme.successGreen,
+                              behavior: SnackBarBehavior.floating,
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12)),
+                              margin: const EdgeInsets.all(16),
+                            ),
+                          );
+                        },
+                      ),
+                    );
+                  },
                 ),
               ),
               const SizedBox(width: 8),
