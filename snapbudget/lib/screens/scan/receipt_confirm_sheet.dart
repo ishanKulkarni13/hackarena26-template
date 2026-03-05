@@ -20,14 +20,14 @@ import '../../theme/app_theme.dart';
 class ReceiptConfirmSheet extends StatefulWidget {
   final ReceiptParseResult result;
 
-  /// Called when the user taps "Add Transaction".
-  /// The caller decides what to do with the transaction (log, provider, Firebase).
   final void Function(Transaction tx) onSave;
+  final String userId;
 
   const ReceiptConfirmSheet({
     super.key,
     required this.result,
     required this.onSave,
+    required this.userId,
   });
 
   @override
@@ -95,6 +95,7 @@ class _ReceiptConfirmSheetState extends State<ReceiptConfirmSheet> {
 
     final tx = Transaction(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
+      userId: widget.userId,
       title: _titleCtrl.text.trim(),
       description: _merchantCtrl.text.trim(),
       amount: amount,
@@ -103,7 +104,8 @@ class _ReceiptConfirmSheetState extends State<ReceiptConfirmSheet> {
       date: _selectedDate,
       merchant: _merchantCtrl.text.trim(),
       paymentMethod: _selectedPaymentMethod,
-      customLabel: customLabel,
+      notes: customLabel,
+      source: TransactionSource.receipt,
     );
 
     Navigator.of(context).pop();
@@ -133,7 +135,9 @@ class _ReceiptConfirmSheetState extends State<ReceiptConfirmSheet> {
           Flexible(
             child: SingleChildScrollView(
               padding: EdgeInsets.fromLTRB(
-                24, 20, 24,
+                24,
+                20,
+                24,
                 MediaQuery.of(context).viewInsets.bottom + 24,
               ),
               child: Form(
@@ -186,8 +190,8 @@ class _ReceiptConfirmSheetState extends State<ReceiptConfirmSheet> {
                           color: AppTheme.warningOrange.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                              color:
-                                  AppTheme.warningOrange.withValues(alpha: 0.4)),
+                              color: AppTheme.warningOrange
+                                  .withValues(alpha: 0.4)),
                         ),
                         child: Row(
                           children: [
@@ -387,8 +391,7 @@ class _ReceiptConfirmSheetState extends State<ReceiptConfirmSheet> {
         ),
         focusedErrorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
-          borderSide:
-              const BorderSide(color: AppTheme.errorRed, width: 1.5),
+          borderSide: const BorderSide(color: AppTheme.errorRed, width: 1.5),
         ),
       ),
     );

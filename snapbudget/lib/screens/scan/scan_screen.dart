@@ -7,7 +7,10 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import 'package:provider/provider.dart';
 import '../../models/transaction_model.dart';
+import '../../providers/auth_provider.dart';
+import '../../providers/transaction_provider.dart';
 import '../../services/gemini_receipt_service.dart';
 import '../../theme/app_theme.dart';
 import 'receipt_confirm_sheet.dart';
@@ -40,7 +43,7 @@ class _ScanScreenState extends State<ScanScreen>
   bool _isCameraPermissionDenied = false;
   bool _isTorchOn = false;
   bool _isProcessing = false; // Gemini is working
-  bool _isCapturing = false;  // shutter flash in progress
+  bool _isCapturing = false; // shutter flash in progress
   bool _showShutterFlash = false;
 
   // ─── Services ─────────────────────────────────────────────────────────────
@@ -61,7 +64,8 @@ class _ScanScreenState extends State<ScanScreen>
       vsync: this,
       duration: const Duration(seconds: 2),
     )..repeat(reverse: true);
-    _pulseAnim = Tween<double>(begin: 0.95, end: 1.05).animate(_pulseController);
+    _pulseAnim =
+        Tween<double>(begin: 0.95, end: 1.05).animate(_pulseController);
 
     // Observe app lifecycle so camera pauses when app goes to background
     WidgetsBinding.instance.addObserver(this);
@@ -119,7 +123,7 @@ class _ScanScreenState extends State<ScanScreen>
     final controller = CameraController(
       backCamera,
       ResolutionPreset.high,
-      enableAudio: false,       // receipts don't need audio
+      enableAudio: false, // receipts don't need audio
       imageFormatGroup: ImageFormatGroup.jpeg,
     );
 
@@ -185,14 +189,19 @@ class _ScanScreenState extends State<ScanScreen>
     if (!mounted) return;
     setState(() => _isProcessing = false);
 
+    final user = context.read<AuthProvider>().user;
+    final userId = user?.uid ?? '';
+
     await showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (ctx) => ReceiptConfirmSheet(
         result: result,
+        userId: userId,
         onSave: (Transaction tx) {
-          // TODO: Replace with provider.addTransaction(tx) when Firebase is wired
+          context.read<TransactionProvider>().addTransaction(tx);
+
           debugPrint(
             '✅ Receipt saved: ${tx.title} | ₹${tx.amount} | ${tx.category.label}',
           );
@@ -241,13 +250,19 @@ class _ScanScreenState extends State<ScanScreen>
     if (!mounted) return;
     setState(() => _isProcessing = false);
 
+    final user = context.read<AuthProvider>().user;
+    final userId = user?.uid ?? '';
+
     await showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (ctx) => ReceiptConfirmSheet(
         result: result,
+        userId: userId,
         onSave: (Transaction tx) {
+          context.read<TransactionProvider>().addTransaction(tx);
+
           debugPrint(
             '✅ Receipt saved: ${tx.title} | ₹${tx.amount} | ${tx.category.label}',
           );
@@ -452,7 +467,8 @@ class _ScanScreenState extends State<ScanScreen>
                   duration: const Duration(milliseconds: 200),
                   padding: const EdgeInsets.symmetric(vertical: 10),
                   decoration: BoxDecoration(
-                    gradient: _selectedMode == i ? AppTheme.primaryGradient : null,
+                    gradient:
+                        _selectedMode == i ? AppTheme.primaryGradient : null,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(
@@ -523,7 +539,8 @@ class _ScanScreenState extends State<ScanScreen>
                           animation: _pulseController,
                           builder: (context, child) {
                             return Positioned(
-                              top: (_pulseController.value * 300).clamp(10, 300),
+                              top:
+                                  (_pulseController.value * 300).clamp(10, 300),
                               left: 40,
                               right: 40,
                               child: Container(
@@ -532,7 +549,8 @@ class _ScanScreenState extends State<ScanScreen>
                                   gradient: LinearGradient(
                                     colors: [
                                       Colors.transparent,
-                                      AppTheme.accentBlue.withValues(alpha: 0.9),
+                                      AppTheme.accentBlue
+                                          .withValues(alpha: 0.9),
                                       Colors.transparent,
                                     ],
                                   ),
@@ -650,8 +668,7 @@ class _ScanScreenState extends State<ScanScreen>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.no_photography_rounded,
-                color: Colors.white30, size: 52),
+            Icon(Icons.no_photography_rounded, color: Colors.white30, size: 52),
             const SizedBox(height: 16),
             Text(
               'Camera access denied',
@@ -661,8 +678,8 @@ class _ScanScreenState extends State<ScanScreen>
             GestureDetector(
               onTap: openAppSettings,
               child: Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 20, vertical: 10),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                 decoration: BoxDecoration(
                   gradient: AppTheme.primaryGradient,
                   borderRadius: BorderRadius.circular(AppTheme.radiusXL),
@@ -712,8 +729,7 @@ class _ScanScreenState extends State<ScanScreen>
             decoration: BoxDecoration(
               color: Colors.white.withValues(alpha: 0.05),
               borderRadius: BorderRadius.circular(20),
-              border:
-                  Border.all(color: Colors.white.withValues(alpha: 0.1)),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -743,12 +759,12 @@ class _ScanScreenState extends State<ScanScreen>
                 ]),
                 const SizedBox(height: 16),
                 ...[
-                  _smsItem('HDFC Bank UPI',
-                      'Debited ₹520 to Uber India', '2h ago', false),
-                  _smsItem('Paytm',
-                      'UPI payment of ₹348 successful', '4h ago', false),
-                  _smsItem('SBI NetBanking',
-                      'Credited ₹65,000 – Salary', '1d ago', true),
+                  _smsItem('HDFC Bank UPI', 'Debited ₹520 to Uber India',
+                      '2h ago', false),
+                  _smsItem('Paytm', 'UPI payment of ₹348 successful', '4h ago',
+                      false),
+                  _smsItem('SBI NetBanking', 'Credited ₹65,000 – Salary',
+                      '1d ago', true),
                 ],
                 const SizedBox(height: 16),
                 Container(
@@ -756,8 +772,7 @@ class _ScanScreenState extends State<ScanScreen>
                   height: 48,
                   decoration: BoxDecoration(
                       gradient: AppTheme.primaryGradient,
-                      borderRadius:
-                          BorderRadius.circular(AppTheme.radiusXL)),
+                      borderRadius: BorderRadius.circular(AppTheme.radiusXL)),
                   child: Center(
                       child: Text('Import All Transactions',
                           style: GoogleFonts.inter(
@@ -797,8 +812,7 @@ class _ScanScreenState extends State<ScanScreen>
             child: Container(
               margin: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                  gradient: AppTheme.primaryGradient,
-                  shape: BoxShape.circle),
+                  gradient: AppTheme.primaryGradient, shape: BoxShape.circle),
               child:
                   const Icon(Icons.mic_rounded, color: Colors.white, size: 50),
             ),
@@ -827,8 +841,7 @@ class _ScanScreenState extends State<ScanScreen>
                 color: AppTheme.accentBlue, size: 18),
             const SizedBox(width: 10),
             Text('AI will auto-categorize your expense',
-                style: GoogleFonts.inter(
-                    fontSize: 13, color: Colors.white70)),
+                style: GoogleFonts.inter(fontSize: 13, color: Colors.white70)),
           ]),
         ),
       ],
@@ -882,8 +895,7 @@ class _ScanScreenState extends State<ScanScreen>
       width: 48,
       height: 48,
       decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.1),
-          shape: BoxShape.circle),
+          color: Colors.white.withValues(alpha: 0.1), shape: BoxShape.circle),
       child: Icon(icon, color: Colors.white, size: 22),
     );
   }
@@ -912,17 +924,15 @@ class _ScanScreenState extends State<ScanScreen>
                 size: 16)),
         const SizedBox(width: 10),
         Expanded(
-            child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(sender,
               style: GoogleFonts.inter(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
                   color: Colors.white)),
           Text(message,
-              style:
-                  GoogleFonts.inter(fontSize: 11, color: Colors.white54),
+              style: GoogleFonts.inter(fontSize: 11, color: Colors.white54),
               maxLines: 1,
               overflow: TextOverflow.ellipsis),
         ])),
