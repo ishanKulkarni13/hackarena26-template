@@ -15,6 +15,7 @@ import '../../providers/transaction_provider.dart';
 import '../../services/gemini_receipt_service.dart';
 import '../../theme/app_theme.dart';
 import 'receipt_confirm_sheet.dart';
+import 'sms_screen.dart';
 
 class ScanScreen extends StatefulWidget {
   final int initialMode;
@@ -835,71 +836,67 @@ class _ScanScreenState extends State<ScanScreen>
   // ──────────────────────────────────────────────────────────────────────────
 
   Widget _buildSMSView() {
-    return SingleChildScrollView(
+    return Center(
       key: const ValueKey('sms'),
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.05),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                gradient: AppTheme.primaryGradient,
+                shape: BoxShape.circle,
+                boxShadow: AppTheme.buttonShadow,
+              ),
+              child: const Icon(Icons.sms_rounded, color: Colors.white, size: 32),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(children: [
-                  Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                          color: AppTheme.accentBlue.withValues(alpha: 0.2),
-                          shape: BoxShape.circle),
-                      child: const Icon(Icons.sms_rounded,
-                          color: AppTheme.accentBlue, size: 20)),
-                  const SizedBox(width: 12),
-                  Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('SMS Auto-Detection',
-                            style: GoogleFonts.inter(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.white)),
-                        Text('3 new transactions found',
-                            style: GoogleFonts.inter(
-                                fontSize: 12, color: Colors.white54)),
-                      ]),
-                ]),
-                const SizedBox(height: 16),
-                ...[
-                  _smsItem('HDFC Bank UPI', 'Debited ₹520 to Uber India',
-                      '2h ago', false),
-                  _smsItem('Paytm', 'UPI payment of ₹348 successful', '4h ago',
-                      false),
-                  _smsItem('SBI NetBanking', 'Credited ₹65,000 – Salary',
-                      '1d ago', true),
-                ],
-                const SizedBox(height: 16),
-                Container(
-                  width: double.infinity,
-                  height: 48,
-                  decoration: BoxDecoration(
-                      gradient: AppTheme.primaryGradient,
-                      borderRadius: BorderRadius.circular(AppTheme.radiusXL)),
-                  child: Center(
-                      child: Text('Import All Transactions',
-                          style: GoogleFonts.inter(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white))),
+            const SizedBox(height: 20),
+            Text(
+              'SMS / UPI Detection',
+              style: GoogleFonts.inter(
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+                color: Colors.white,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'Auto-detect transactions from your bank SMS messages.\nAll processing is on-device.',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(
+                  fontSize: 14, color: Colors.white60, height: 1.6),
+            ),
+            const SizedBox(height: 28),
+            GestureDetector(
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const SmsScreen()),
+              ),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                decoration: BoxDecoration(
+                  gradient: AppTheme.primaryGradient,
+                  borderRadius: BorderRadius.circular(AppTheme.radiusXL),
+                  boxShadow: AppTheme.buttonShadow,
                 ),
-              ],
+                child: Center(
+                  child: Text(
+                    'Open SMS Tracker',
+                    style: GoogleFonts.inter(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -1117,48 +1114,6 @@ class _ScanScreenState extends State<ScanScreen>
       decoration: BoxDecoration(
           color: Colors.white.withValues(alpha: 0.1), shape: BoxShape.circle),
       child: Icon(icon, color: Colors.white, size: 22),
-    );
-  }
-
-  Widget _smsItem(String sender, String message, String time, bool isCredit) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.05),
-          borderRadius: BorderRadius.circular(12)),
-      child: Row(children: [
-        Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-                color: isCredit
-                    ? AppTheme.successGreen.withValues(alpha: 0.15)
-                    : AppTheme.errorRed.withValues(alpha: 0.15),
-                shape: BoxShape.circle),
-            child: Icon(
-                isCredit
-                    ? Icons.arrow_downward_rounded
-                    : Icons.arrow_upward_rounded,
-                color: isCredit ? AppTheme.successGreen : AppTheme.errorRed,
-                size: 16)),
-        const SizedBox(width: 10),
-        Expanded(
-            child:
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(sender,
-              style: GoogleFonts.inter(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white)),
-          Text(message,
-              style: GoogleFonts.inter(fontSize: 11, color: Colors.white54),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis),
-        ])),
-        Text(time,
-            style: GoogleFonts.inter(fontSize: 10, color: Colors.white38)),
-      ]),
     );
   }
 }

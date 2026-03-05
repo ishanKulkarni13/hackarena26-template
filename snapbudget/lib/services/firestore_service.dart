@@ -51,6 +51,35 @@ class FirestoreService {
   Future<void> addSmsTransaction(SmsTransactionModel smsTx) =>
       _db.collection('sms_transactions').doc(smsTx.smsId).set(smsTx.toMap());
 
+  Stream<List<SmsTransactionModel>> getSmsTransactions(String userId) => _db
+      .collection('sms_transactions')
+      .where('userId', isEqualTo: userId)
+      .orderBy('receivedAt', descending: true)
+      .snapshots()
+      .map((snap) => snap.docs
+          .map((doc) => SmsTransactionModel.fromMap(doc.data(), doc.id))
+          .toList());
+
+  Future<void> updateSmsStatus(
+    String smsId, {
+    required SmsStatus status,
+    String? linkedTxId,
+  }) =>
+      _db.collection('sms_transactions').doc(smsId).update({
+        'status': status.name,
+        if (linkedTxId != null) 'linkedTxId': linkedTxId,
+      });
+
+  Future<bool> smsDedupeExists(String dedupeHash, String userId) async {
+    final snap = await _db
+        .collection('sms_transactions')
+        .where('userId', isEqualTo: userId)
+        .where('dedupeHash', isEqualTo: dedupeHash)
+        .limit(1)
+        .get();
+    return snap.docs.isNotEmpty;
+  }
+
   // --- SPLIT GROUPS ---
   Future<void> createSplitGroup(SplitGroupModel group) =>
       _db.collection('split_groups').doc(group.groupId).set(group.toMap());
