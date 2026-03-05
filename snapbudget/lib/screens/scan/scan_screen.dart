@@ -814,6 +814,116 @@ class _ScanScreenState extends State<ScanScreen>
   }
 
   // ──────────────────────────────────────────────────────────────────────────
+  // STT — initialise, start, stop, process
+  // ──────────────────────────────────────────────────────────────────────────
+
+  Future<void> _initStt() async {
+    debugPrint('🎤 [ScanScreen] Initialising SpeechToText...');
+    final available = await _stt.initialize(
+      onStatus: (status) {
+        debugPrint('🎤 [STT] status: $status');
+        // When STT auto-stops after silence, transition to processing
+        if (status == 'done' && _isListening) {
+          _stopListening();
+        }
+      },
+      onError: (e) {
+        debugPrint('❌ [STT] error: $e');
+        if (mounted) setState(() => _isListening = false);
+      },
+    );
+    if (mounted) {
+      setState(() {
+        _sttReady = available;
+        _micPermissionDenied = !available;
+      });
+      debugPrint('🎤 [STT] available: $available');
+    }
+  }
+
+  Future<void> _startListening() async {
+    if (!_sttReady || _isListening || _isVoiceProcessing) return;
+    setState(() {
+      _liveTranscript = '';
+      _isListening = true;
+    });
+    HapticFeedback.lightImpact();
+    await _stt.listen(
+      onResult: (result) {
+        if (mounted) {
+          setState(() => _liveTranscript = result.recognizedWords);
+        }
+      },
+      listenFor: const Duration(seconds: 30),
+      pauseFor: const Duration(seconds: 3),
+      partialResults: true,
+      localeId: 'en_IN',
+    );
+  }
+
+  Future<void> _stopListening() async {
+    if (!_isListening) return;
+    await _stt.stop();
+    setState(() => _isListening = false);
+    HapticFeedback.mediumImpact();
+    final captured = _liveTranscript.trim();
+    debugPrint('🎤 [ScanScreen] Stopped. Transcript: "$captured"');
+    if (captured.isNotEmpty) {
+      await _processVoiceTranscript(captured);
+    }
+  }
+
+  Future<void> _processVoiceTranscript(String transcript) async {
+    if (!mounted) return;
+    setState(() => _isVoiceProcessing = true);
+    debugPrint('🧠 [ScanScreen] Sending to Gemini: "$transcript"');
+
+    final result = await _geminiService.analyseVoiceText(transcript);
+
+    if (!mounted) return;
+    setState(() {
+      _isVoiceProcessing = false;
+      _liveTranscript = '';
+    });
+
+    if (!result.parsedSuccessfully) {
+      debugPrint('⚠️ [ScanScreen] Voice parse failed — showing blank form');
+    }
+
+    final user = context.read<AuthProvider>().user;
+    final userId = user?.uid ?? '';
+
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => ReceiptConfirmSheet(
+        result: result,
+        userId: userId,
+        onSave: (Transaction tx) {
+          // ── Firebase integration point ──
+          context.read<TransactionProvider>().addTransaction(tx);
+          debugPrint('✅ Voice tx saved: ${tx.title} | ₹${tx.amount}');
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                '${tx.title} — ₹${tx.amount.toStringAsFixed(0)} added!',
+                style: GoogleFonts.inter(color: Colors.white),
+              ),
+              backgroundColor: AppTheme.successGreen,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+              margin: const EdgeInsets.all(16),
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
   // Voice view
   // ──────────────────────────────────────────────────────────────────────────
 
