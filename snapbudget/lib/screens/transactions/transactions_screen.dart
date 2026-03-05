@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../../theme/app_theme.dart';
 import '../../models/transaction_model.dart';
+import '../../widgets/transaction_details_sheet.dart';
 
 class TransactionsScreen extends StatefulWidget {
   const TransactionsScreen({super.key});
@@ -274,54 +275,57 @@ class _TransactionsScreenState extends State<TransactionsScreen>
 
   Widget _txItem(Transaction tx, NumberFormat fmt) {
     final isExp = tx.type == TransactionType.expense;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-          color: AppTheme.cardWhite,
-          borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
-          boxShadow: AppTheme.cardShadow),
-      child: Row(
-        children: [
-          Container(
-            width: 46,
-            height: 46,
-            decoration: BoxDecoration(
-                color: isExp
-                    ? AppTheme.errorRed.withOpacity(0.08)
-                    : AppTheme.successGreen.withOpacity(0.08),
-                borderRadius: BorderRadius.circular(13)),
-            child: Center(
-                child: Text(tx.category.emoji,
-                    style: const TextStyle(fontSize: 20))),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child:
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(tx.title,
+    return GestureDetector(
+      onTap: () => showTransactionDetailsSheet(context, tx),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+            color: AppTheme.cardWhite,
+            borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
+            boxShadow: AppTheme.cardShadow),
+        child: Row(
+          children: [
+            Container(
+              width: 46,
+              height: 46,
+              decoration: BoxDecoration(
+                  color: isExp
+                      ? AppTheme.errorRed.withOpacity(0.08)
+                      : AppTheme.successGreen.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(13)),
+              child: Center(
+                  child: Text(tx.category.emoji,
+                      style: const TextStyle(fontSize: 20))),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child:
+                  Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(tx.title,
+                    style: GoogleFonts.inter(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.textDark)),
+                const SizedBox(height: 2),
+                Text(tx.category.label,
+                    style: GoogleFonts.inter(
+                        fontSize: 11, color: AppTheme.textLight)),
+              ]),
+            ),
+            Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+              Text('${isExp ? '-' : '+'}${fmt.format(tx.amount)}',
                   style: GoogleFonts.inter(
                       fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: AppTheme.textDark)),
+                      fontWeight: FontWeight.w700,
+                      color: isExp ? AppTheme.errorRed : AppTheme.successGreen)),
               const SizedBox(height: 2),
-              Text(tx.category.label,
-                  style: GoogleFonts.inter(
-                      fontSize: 11, color: AppTheme.textLight)),
+              Text(DateFormat('MMM d').format(tx.date),
+                  style:
+                      GoogleFonts.inter(fontSize: 10, color: AppTheme.textLight)),
             ]),
-          ),
-          Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-            Text('${isExp ? '-' : '+'}${fmt.format(tx.amount)}',
-                style: GoogleFonts.inter(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: isExp ? AppTheme.errorRed : AppTheme.successGreen)),
-            const SizedBox(height: 2),
-            Text(DateFormat('MMM d').format(tx.date),
-                style:
-                    GoogleFonts.inter(fontSize: 10, color: AppTheme.textLight)),
-          ]),
-        ],
+          ],
+        ),
       ),
     );
   }
