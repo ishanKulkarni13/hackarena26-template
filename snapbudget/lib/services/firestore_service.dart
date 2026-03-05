@@ -28,13 +28,11 @@ class FirestoreService {
   Stream<List<tm.Transaction>> getTransactions(String userId) => _db
       .collection('transactions')
       .where('userId', isEqualTo: userId)
-      // No orderBy here — avoids needing a composite Firestore index.
-      // Sorting is done in Dart after the documents arrive.
+      .orderBy('date', descending: true)
       .snapshots()
       .map((snap) => snap.docs
           .map((doc) => tm.Transaction.fromMap(doc.data(), doc.id))
-          .toList()
-            ..sort((a, b) => b.date.compareTo(a.date)));
+          .toList());
 
   // --- RECEIPTS ---
   Future<void> addReceipt(ReceiptModel receipt) =>
@@ -80,6 +78,11 @@ class FirestoreService {
       .map((snap) => snap.docs
           .map((doc) => GroupExpenseModel.fromMap(doc.data(), doc.id))
           .toList());
+
+  Future<void> updateGroupExpense(GroupExpenseModel expense) => _db
+      .collection('group_expenses')
+      .doc(expense.expenseId)
+      .set(expense.toMap(), SetOptions(merge: true));
 
   // --- BUDGETS ---
   Future<void> setBudget(BudgetModel budget) =>

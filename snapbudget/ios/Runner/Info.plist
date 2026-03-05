@@ -70,9 +70,5 @@
 		<string>SnapBudget needs camera access to scan receipts</string>
 		<key>NSPhotoLibraryUsageDescription</key>
 		<string>SnapBudget needs photo library access to import receipts</string>
-		<key>NSMicrophoneUsageDescription</key>
-		<string>SnapBudget needs microphone access to record voice transactions</string>
-		<key>NSSpeechRecognitionUsageDescription</key>
-		<string>SnapBudget uses speech recognition to convert your voice into transaction details</string>
 	</dict>
 </plist>

@@ -33,7 +33,7 @@ class TransactionProvider extends ChangeNotifier {
         _setLoading(false);
       },
       onError: (e) {
-        debugPrint('❌ [TransactionProvider] Firestore error: $e');
+        debugPrint('Error loading transactions: $e');
         _setLoading(false);
       },
     );

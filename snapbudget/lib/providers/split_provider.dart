@@ -61,7 +61,16 @@ class SplitProvider extends ChangeNotifier {
     try {
       await _firestoreService.addGroupExpense(expense);
     } catch (e) {
-      print('Error adding group expense: $e');
+      print('Group expense added with error $e');
+      rethrow;
+    }
+  }
+
+  Future<void> updateGroupExpense(GroupExpenseModel expense) async {
+    try {
+      await _firestoreService.updateGroupExpense(expense);
+    } catch (e) {
+      print('Group expense updated with error $e');
       rethrow;
     }
   }
