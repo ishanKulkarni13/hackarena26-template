@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../theme/app_theme.dart';
 import '../home/home_screen.dart';
-import '../transactions/transactions_screen.dart';
 import '../scan/scan_screen.dart';
 import '../splitsync/splitsync_screen.dart';
 import '../analytics/analytics_screen.dart';
@@ -21,18 +20,16 @@ class _MainNavScreenState extends State<MainNavScreen>
 
   final List<Widget> _screens = [
     const HomeScreen(),
-    const TransactionsScreen(),
-    const ScanScreen(),
     const SplitSyncScreen(),
+    const ScanScreen(),
     const AnalyticsScreen(),
     const ProfileScreen(),
   ];
 
   final List<_NavItem> _navItems = [
     _NavItem(icon: Icons.home_rounded, label: 'Home'),
-    _NavItem(icon: Icons.receipt_long_rounded, label: 'Transactions'),
-    _NavItem(icon: Icons.document_scanner_rounded, label: 'Scan'),
     _NavItem(icon: Icons.people_rounded, label: 'SplitSync'),
+    _NavItem(icon: Icons.document_scanner_rounded, label: 'Scan'),
     _NavItem(icon: Icons.bar_chart_rounded, label: 'Analytics'),
     _NavItem(icon: Icons.person_rounded, label: 'Profile'),
   ];
