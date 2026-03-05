@@ -1,13 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 import '../../theme/app_theme.dart';
+import '../../providers/auth_provider.dart';
+import '../../providers/transaction_provider.dart';
 import '../welcome/welcome_screen.dart';
+import '../budget/budget_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final authProvider = context.watch<AuthProvider>();
+    final txProvider = context.watch<TransactionProvider>();
+    final user = authProvider.user;
+
     return Scaffold(
       backgroundColor: AppTheme.background,
       body: SingleChildScrollView(
@@ -60,41 +68,51 @@ class ProfileScreen extends StatelessWidget {
                           border: Border.all(
                               color: Colors.white.withOpacity(0.5), width: 3),
                         ),
-                        child: const Icon(Icons.person_rounded,
-                            size: 50, color: Colors.white),
+                        child: user?.photoURL != null
+                            ? ClipRRect(
+                                borderRadius: BorderRadius.circular(45),
+                                child: Image.network(user!.photoURL!,
+                                    fit: BoxFit.cover),
+                              )
+                            : const Icon(Icons.person_rounded,
+                                size: 50, color: Colors.white),
                       ),
-                      Positioned(
-                        bottom: 0,
-                        right: 0,
-                        child: Container(
-                          width: 28,
-                          height: 28,
-                          decoration: const BoxDecoration(
-                              color: AppTheme.successGreen,
-                              shape: BoxShape.circle),
-                          child: const Icon(Icons.verified_rounded,
-                              color: Colors.white, size: 16),
+                      if (authProvider.isAuthenticated)
+                        Positioned(
+                          bottom: 0,
+                          right: 0,
+                          child: Container(
+                            width: 28,
+                            height: 28,
+                            decoration: const BoxDecoration(
+                                color: AppTheme.successGreen,
+                                shape: BoxShape.circle),
+                            child: const Icon(Icons.verified_rounded,
+                                color: Colors.white, size: 16),
+                          ),
                         ),
-                      ),
                     ]),
                     const SizedBox(height: 12),
-                    Text('Rahul Sharma',
+                    Text(user?.displayName ?? 'Guest User',
                         style: GoogleFonts.inter(
                             fontSize: 20,
                             fontWeight: FontWeight.w700,
                             color: Colors.white)),
                     const SizedBox(height: 4),
-                    Text('+91 98765 43210',
+                    Text(user?.email ?? user?.phoneNumber ?? 'SnapBudget User',
                         style: GoogleFonts.inter(
                             fontSize: 14, color: Colors.white70)),
                     const SizedBox(height: 16),
                     // Stats row
                     Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                      _headerStat('₹1.24L', 'Balance'),
+                      _headerStat(
+                          '₹${(txProvider.totalIncome - txProvider.totalExpense).toInt()}',
+                          'Balance'),
                       _vDivider(),
-                      _headerStat('89', 'Transactions'),
+                      _headerStat(
+                          '${txProvider.transactions.length}', 'Transactions'),
                       _vDivider(),
-                      _headerStat('4', 'Splits'),
+                      _headerStat('0', 'Splits'),
                     ]),
                   ]),
                 ),
@@ -143,8 +161,14 @@ class ProfileScreen extends StatelessWidget {
 
                 const SizedBox(height: 8),
                 _sectionHeader('Budget & Alerts'),
-                _settingTile(Icons.savings_rounded, 'Monthly Budget',
-                    '₹15,000 set', AppTheme.warningOrange),
+                GestureDetector(
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const BudgetScreen()),
+                  ),
+                  child: _settingTile(Icons.savings_rounded, 'Monthly Budget',
+                      '₹15,000 set', AppTheme.warningOrange),
+                ),
                 _settingTile(Icons.notifications_rounded, 'Notifications',
                     'Smart alerts on', AppTheme.errorRed),
                 _settingTile(Icons.cloud_sync_rounded, 'Cloud Backup',
@@ -163,17 +187,23 @@ class ProfileScreen extends StatelessWidget {
 
                 // Logout
                 GestureDetector(
-                  onTap: () => Navigator.of(context).pushAndRemoveUntil(
-                    PageRouteBuilder(
-                      pageBuilder: (context, animation, secondaryAnimation) =>
-                          const WelcomeScreen(),
-                      transitionsBuilder:
-                          (context, animation, secondaryAnimation, child) =>
+                  onTap: () async {
+                    await authProvider.signOut();
+                    if (context.mounted) {
+                      Navigator.of(context).pushAndRemoveUntil(
+                        PageRouteBuilder(
+                          pageBuilder:
+                              (context, animation, secondaryAnimation) =>
+                                  const WelcomeScreen(),
+                          transitionsBuilder: (context, animation,
+                                  secondaryAnimation, child) =>
                               FadeTransition(opacity: animation, child: child),
-                      transitionDuration: const Duration(milliseconds: 400),
-                    ),
-                    (route) => false,
-                  ),
+                          transitionDuration: const Duration(milliseconds: 400),
+                        ),
+                        (route) => false,
+                      );
+                    }
+                  },
                   child: Container(
                     width: double.infinity,
                     height: 52,
@@ -183,18 +213,26 @@ class ProfileScreen extends StatelessWidget {
                       border:
                           Border.all(color: AppTheme.errorRed.withOpacity(0.2)),
                     ),
-                    child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(Icons.logout_rounded,
-                              color: AppTheme.errorRed, size: 20),
-                          const SizedBox(width: 8),
-                          Text('Log Out',
-                              style: GoogleFonts.inter(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppTheme.errorRed)),
-                        ]),
+                    child: authProvider.isLoading
+                        ? const Center(
+                            child: SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: AppTheme.errorRed),
+                          ))
+                        : Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                                const Icon(Icons.logout_rounded,
+                                    color: AppTheme.errorRed, size: 20),
+                                const SizedBox(width: 8),
+                                Text('Log Out',
+                                    style: GoogleFonts.inter(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w600,
+                                        color: AppTheme.errorRed)),
+                              ]),
                   ),
                 ),
 

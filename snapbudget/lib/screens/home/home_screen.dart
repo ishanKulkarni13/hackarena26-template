@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import '../../theme/app_theme.dart';
 import '../../models/transaction_model.dart';
+import '../../providers/auth_provider.dart';
+import '../../providers/transaction_provider.dart';
 import '../transactions/transactions_screen.dart';
 import '../scan/scan_screen.dart';
 import '../splitsync/splitsync_screen.dart';
@@ -20,61 +23,16 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final List<Transaction> _recentTransactions = [
-    Transaction(
-      id: '1',
-      title: 'Swiggy Order',
-      description: 'Food delivery',
-      amount: 348,
-      type: TransactionType.expense,
-      category: TransactionCategory.food,
-      date: DateTime.now().subtract(const Duration(hours: 2)),
-      merchant: 'Swiggy',
-      paymentMethod: PaymentMethod.upi,
-    ),
-    Transaction(
-      id: '2',
-      title: 'Salary Credit',
-      description: 'Monthly salary',
-      amount: 65000,
-      type: TransactionType.income,
-      category: TransactionCategory.salary,
-      date: DateTime.now().subtract(const Duration(days: 1)),
-      paymentMethod: PaymentMethod.netBanking,
-    ),
-    Transaction(
-      id: '3',
-      title: 'Uber Ride',
-      description: 'Airport to home',
-      amount: 520,
-      type: TransactionType.expense,
-      category: TransactionCategory.transport,
-      date: DateTime.now().subtract(const Duration(days: 2)),
-      merchant: 'Uber',
-      paymentMethod: PaymentMethod.upi,
-    ),
-    Transaction(
-      id: '4',
-      title: 'Netflix',
-      description: 'Monthly subscription',
-      amount: 649,
-      type: TransactionType.expense,
-      category: TransactionCategory.entertainment,
-      date: DateTime.now().subtract(const Duration(days: 3)),
-      paymentMethod: PaymentMethod.card,
-    ),
-    Transaction(
-      id: '5',
-      title: 'Amazon Shopping',
-      description: 'Electronics',
-      amount: 2499,
-      type: TransactionType.expense,
-      category: TransactionCategory.shopping,
-      date: DateTime.now().subtract(const Duration(days: 4)),
-      merchant: 'Amazon',
-      paymentMethod: PaymentMethod.card,
-    ),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final auth = context.read<AuthProvider>();
+      if (auth.isAuthenticated) {
+        context.read<TransactionProvider>().loadTransactions(auth.user!.uid);
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -93,15 +51,78 @@ class _HomeScreenState extends State<HomeScreen> {
           SliverToBoxAdapter(child: _buildBalanceCard(currencyFormat)),
           SliverToBoxAdapter(child: _buildQuickActions()),
           SliverToBoxAdapter(child: _buildAIInsightCard()),
-          SliverToBoxAdapter(child: _buildRecentHeader()),
-          SliverList(
-            delegate: SliverChildBuilderDelegate(
-              (context, index) => _buildTransactionItem(
-                _recentTransactions[index],
-                currencyFormat,
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Recent Transactions',
+                    style: GoogleFonts.inter(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.textDark,
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: () {
+                      if (widget.onTabChange != null) {
+                        widget.onTabChange!(3); // Transactions tab
+                      } else {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const TransactionsScreen()),
+                        );
+                      }
+                    },
+                    child: Text(
+                      'See all',
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.primaryPurple,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              childCount: _recentTransactions.length,
             ),
+          ),
+          Consumer<TransactionProvider>(
+            builder: (context, provider, child) {
+              if (provider.isLoading && provider.transactions.isEmpty) {
+                return const SliverToBoxAdapter(
+                    child: Center(child: CircularProgressIndicator()));
+              }
+
+              final transactions = provider.transactions.take(5).toList();
+
+              if (transactions.isEmpty) {
+                return SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 20),
+                    child: Center(
+                      child: Text(
+                        'No transactions found',
+                        style: GoogleFonts.inter(color: AppTheme.textLight),
+                      ),
+                    ),
+                  ),
+                );
+              }
+
+              return SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) {
+                    final tx = transactions[index];
+                    return _buildTransactionItem(context, tx, currencyFormat);
+                  },
+                  childCount: transactions.length,
+                ),
+              );
+            },
           ),
           SliverToBoxAdapter(child: SizedBox(height: bottomInset)),
         ],
@@ -543,48 +564,14 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildRecentHeader() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            'Recent Transactions',
-            style: GoogleFonts.inter(
-              fontSize: 17,
-              fontWeight: FontWeight.w700,
-              color: AppTheme.textDark,
-            ),
-          ),
-          GestureDetector(
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const TransactionsScreen()),
-              );
-            },
-            child: Text(
-              'See all',
-              style: GoogleFonts.inter(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: AppTheme.primaryPurple,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTransactionItem(Transaction tx, NumberFormat fmt) {
+  Widget _buildTransactionItem(
+      BuildContext context, Transaction tx, NumberFormat fmt) {
     final isExpense = tx.type == TransactionType.expense;
     final timeAgo = _formatDate(tx.date);
     final amountStr = '${isExpense ? '-' : '+'}${fmt.format(tx.amount)}';
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
+      padding: const EdgeInsets.fromLTRB(0, 0, 0, 10),
       child: GestureDetector(
         onTap: () => showTransactionDetailsSheet(context, tx),
         child: Container(

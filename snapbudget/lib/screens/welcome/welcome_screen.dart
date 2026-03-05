@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../theme/app_theme.dart';
-import '../home/main_nav_screen.dart';
 import '../auth/login_screen.dart';
+import '../auth/signup_screen.dart';
 
 class WelcomeScreen extends StatefulWidget {
   const WelcomeScreen({super.key});
@@ -75,188 +75,195 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                 ),
               );
             },
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 28),
-              child: Column(
-                children: [
-                  const SizedBox(height: 36),
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 28),
+                child: Column(
+                  children: [
+                    const SizedBox(height: 36),
 
-                  // Logo + Brand
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        width: 38,
-                        height: 38,
-                        decoration: BoxDecoration(
-                          color: AppTheme.primaryPurple,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Icon(
-                          Icons.account_balance_wallet_rounded,
-                          color: Colors.white,
-                          size: 22,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Text(
-                        'SnapBudget',
-                        style: GoogleFonts.inter(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w700,
-                          color: AppTheme.textDark,
-                          letterSpacing: -0.3,
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 36),
-
-                  // Headline
-                  Text(
-                    'Take control of\nyour money.',
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.inter(
-                      fontSize: 34,
-                      fontWeight: FontWeight.w800,
-                      color: AppTheme.textDark,
-                      height: 1.2,
-                      letterSpacing: -0.8,
-                    ),
-                  ),
-
-                  const SizedBox(height: 40),
-
-                  // Hero Image Card
-                  ScaleTransition(
-                    scale: _scaleAnim,
-                    child: Container(
-                      width: double.infinity,
-                      height: size.height * 0.35,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(28),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppTheme.primaryPurple.withOpacity(0.15),
-                            blurRadius: 30,
-                            offset: const Offset(0, 10),
+                    // Logo + Brand
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          width: 38,
+                          height: 38,
+                          decoration: BoxDecoration(
+                            color: AppTheme.primaryPurple,
+                            borderRadius: BorderRadius.circular(10),
                           ),
-                        ],
+                          child: const Icon(
+                            Icons.account_balance_wallet_rounded,
+                            color: Colors.white,
+                            size: 22,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Text(
+                          'SnapBudget',
+                          style: GoogleFonts.inter(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w700,
+                            color: AppTheme.textDark,
+                            letterSpacing: -0.3,
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 36),
+
+                    // Headline
+                    Text(
+                      'Take control of\nyour money.',
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.inter(
+                        fontSize: 34,
+                        fontWeight: FontWeight.w800,
+                        color: AppTheme.textDark,
+                        height: 1.2,
+                        letterSpacing: -0.8,
                       ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(28),
-                        child: Stack(
-                          children: [
-                            // Dark background
-                            Container(
-                              decoration: const BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [
-                                    Color(0xFF0D1117),
-                                    Color(0xFF0D1B2A),
-                                  ],
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                ),
-                              ),
-                            ),
+                    ),
 
-                            // Glow effects
-                            Positioned(
-                              top: -60,
-                              left: -60,
-                              child: Container(
-                                width: 200,
-                                height: 200,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: AppTheme.accentBlue.withOpacity(0.12),
-                                ),
-                              ),
-                            ),
-                            Positioned(
-                              bottom: -40,
-                              right: -40,
-                              child: Container(
-                                width: 160,
-                                height: 160,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color:
-                                      AppTheme.primaryPurple.withOpacity(0.15),
-                                ),
-                              ),
-                            ),
+                    const SizedBox(height: 40),
 
-                            // AI Wallet Illustration
-                            Center(
-                              child: _buildAIWalletIllustration(),
+                    // Hero Image Card
+                    ScaleTransition(
+                      scale: _scaleAnim,
+                      child: Container(
+                        width: double.infinity,
+                        height: size.height * 0.35,
+                        constraints: const BoxConstraints(
+                          minHeight: 200,
+                          maxHeight: 350,
+                        ),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(28),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppTheme.primaryPurple.withOpacity(0.15),
+                              blurRadius: 30,
+                              offset: const Offset(0, 10),
                             ),
                           ],
                         ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(28),
+                          child: Stack(
+                            children: [
+                              // Dark background
+                              Container(
+                                decoration: const BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      Color(0xFF0D1117),
+                                      Color(0xFF0D1B2A),
+                                    ],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  ),
+                                ),
+                              ),
+
+                              // Glow effects
+                              Positioned(
+                                top: -60,
+                                left: -60,
+                                child: Container(
+                                  width: 200,
+                                  height: 200,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color:
+                                        AppTheme.accentBlue.withOpacity(0.12),
+                                  ),
+                                ),
+                              ),
+                              Positioned(
+                                bottom: -40,
+                                right: -40,
+                                child: Container(
+                                  width: 160,
+                                  height: 160,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: AppTheme.primaryPurple
+                                        .withOpacity(0.15),
+                                  ),
+                                ),
+                              ),
+
+                              // AI Wallet Illustration
+                              Center(
+                                child: _buildAIWalletIllustration(),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
-                  ),
 
-                  const Spacer(),
+                    SizedBox(height: size.height * 0.08),
 
-                  // CTA Buttons
-                  _buildGetStartedButton(context),
-                  const SizedBox(height: 14),
-                  _buildAlreadyHaveAccount(context),
+                    // CTA Buttons
+                    _buildGetStartedButton(context),
+                    const SizedBox(height: 14),
+                    _buildAlreadyHaveAccount(context),
 
-                  const SizedBox(height: 28),
+                    const SizedBox(height: 28),
 
-                  // Footer Links
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      GestureDetector(
-                        onTap: () {},
-                        child: Text(
-                          'Privacy Policy',
-                          style: GoogleFonts.inter(
-                            fontSize: 12,
-                            color: AppTheme.textLight,
+                    // Footer Links
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        GestureDetector(
+                          onTap: () {},
+                          child: Text(
+                            'Privacy Policy',
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              color: AppTheme.textLight,
+                            ),
                           ),
                         ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                        child: Text(
-                          '·',
-                          style: TextStyle(
-                            color: AppTheme.textLight,
-                            fontSize: 14,
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          child: Text(
+                            '·',
+                            style: TextStyle(
+                              color: AppTheme.textLight,
+                              fontSize: 14,
+                            ),
                           ),
                         ),
-                      ),
-                      GestureDetector(
-                        onTap: () {},
-                        child: Text(
-                          'Terms of Service',
-                          style: GoogleFonts.inter(
-                            fontSize: 12,
-                            color: AppTheme.textLight,
+                        GestureDetector(
+                          onTap: () {},
+                          child: Text(
+                            'Terms of Service',
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              color: AppTheme.textLight,
+                            ),
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Home indicator bar
-                  Container(
-                    width: 120,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: AppTheme.textDark.withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(4),
+                      ],
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                ],
+                    const SizedBox(height: 16),
+
+                    // Home indicator bar
+                    Container(
+                      width: 120,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: AppTheme.textDark.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                ),
               ),
             ),
           ),
@@ -390,16 +397,8 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   Widget _buildGetStartedButton(BuildContext context) {
     return GestureDetector(
       onTap: () {
-        Navigator.of(context).pushReplacement(
-          PageRouteBuilder(
-            pageBuilder: (context, animation, secondaryAnimation) =>
-                const MainNavScreen(),
-            transitionsBuilder:
-                (context, animation, secondaryAnimation, child) {
-              return FadeTransition(opacity: animation, child: child);
-            },
-            transitionDuration: const Duration(milliseconds: 400),
-          ),
+        Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const SignupScreen()),
         );
       },
       child: Container(

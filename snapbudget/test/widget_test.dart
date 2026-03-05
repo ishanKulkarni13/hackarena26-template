@@ -13,7 +13,7 @@ void main() {
   testWidgets('App starts on welcome screen smoke test',
       (WidgetTester tester) async {
     // Build our app and trigger a frame.
-    await tester.pumpWidget(const SnapBudgetApp());
+    await tester.pumpWidget(const SnapBudgetApp(isInitialized: true));
 
     // Verify that the welcome screen starts (it should contain 'SnapBudget' text).
     expect(find.text('Take control of\nyour money.'), findsOneWidget);

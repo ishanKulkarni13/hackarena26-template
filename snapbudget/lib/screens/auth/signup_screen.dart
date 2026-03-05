@@ -5,39 +5,48 @@ import '../../providers/auth_provider.dart';
 import '../../theme/app_theme.dart';
 import '../home/main_nav_screen.dart';
 
-import 'signup_screen.dart';
-
-class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+class SignupScreen extends StatefulWidget {
+  const SignupScreen({super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  State<SignupScreen> createState() => _SignupScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _SignupScreenState extends State<SignupScreen> {
+  final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
   bool _isLoading = false;
   bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
 
   @override
   void dispose() {
+    _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
+    _confirmPasswordController.dispose();
     super.dispose();
   }
 
-  Future<void> _handleLogin() async {
+  Future<void> _handleSignup() async {
     if (_emailController.text.trim().isEmpty ||
-        _passwordController.text.trim().isEmpty) {
-      _showError('Please enter both email and password');
+        _passwordController.text.trim().isEmpty ||
+        _nameController.text.trim().isEmpty) {
+      _showError('Please fill in all fields');
+      return;
+    }
+
+    if (_passwordController.text != _confirmPasswordController.text) {
+      _showError('Passwords do not match');
       return;
     }
 
     setState(() => _isLoading = true);
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      await authProvider.signInWithEmailPassword(
+      await authProvider.signUpWithEmailPassword(
         _emailController.text.trim(),
         _passwordController.text.trim(),
       );
@@ -93,12 +102,11 @@ class _LoginScreenState extends State<LoginScreen> {
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
                 ),
-                const SizedBox(height: 32),
-
+                const SizedBox(height: 24),
                 Text(
-                  'Welcome back! 👋',
+                  'Create Account 🚀',
                   style: GoogleFonts.inter(
-                    fontSize: 30,
+                    fontSize: 28,
                     fontWeight: FontWeight.w800,
                     color: AppTheme.textDark,
                     letterSpacing: -0.5,
@@ -106,16 +114,21 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Sign in to continue to SnapBudget',
+                  'Join SnapBudget to start tracking',
                   style: GoogleFonts.inter(
                     fontSize: 15,
                     color: AppTheme.textMedium,
                   ),
                 ),
-
-                const SizedBox(height: 48),
-
-                // Email input
+                const SizedBox(height: 32),
+                _buildInputLabel('Full Name'),
+                const SizedBox(height: 8),
+                _buildTextField(
+                  controller: _nameController,
+                  hint: 'Enter your name',
+                  icon: Icons.person_outline_rounded,
+                ),
+                const SizedBox(height: 20),
                 _buildInputLabel('Email Address'),
                 const SizedBox(height: 8),
                 _buildTextField(
@@ -124,40 +137,33 @@ class _LoginScreenState extends State<LoginScreen> {
                   icon: Icons.email_outlined,
                   keyboardType: TextInputType.emailAddress,
                 ),
-
-                const SizedBox(height: 24),
-
-                // Password input
+                const SizedBox(height: 20),
                 _buildInputLabel('Password'),
                 const SizedBox(height: 8),
                 _buildTextField(
                   controller: _passwordController,
-                  hint: 'Enter your password',
+                  hint: 'Create a password',
                   icon: Icons.lock_outline_rounded,
                   isPassword: true,
                   obscureText: _obscurePassword,
                   onToggleVisibility: () =>
                       setState(() => _obscurePassword = !_obscurePassword),
                 ),
-
-                const SizedBox(height: 12),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: Text(
-                    'Forgot Password?',
-                    style: GoogleFonts.inter(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: AppTheme.primaryPurple,
-                    ),
-                  ),
+                const SizedBox(height: 20),
+                _buildInputLabel('Confirm Password'),
+                const SizedBox(height: 8),
+                _buildTextField(
+                  controller: _confirmPasswordController,
+                  hint: 'Repeat your password',
+                  icon: Icons.lock_clock_outlined,
+                  isPassword: true,
+                  obscureText: _obscureConfirmPassword,
+                  onToggleVisibility: () => setState(
+                      () => _obscureConfirmPassword = !_obscureConfirmPassword),
                 ),
-
                 const SizedBox(height: 40),
-
-                // Sign In button
                 GestureDetector(
-                  onTap: _isLoading ? null : _handleLogin,
+                  onTap: _isLoading ? null : _handleSignup,
                   child: Container(
                     width: double.infinity,
                     height: 58,
@@ -172,12 +178,10 @@ class _LoginScreenState extends State<LoginScreen> {
                               width: 24,
                               height: 24,
                               child: CircularProgressIndicator(
-                                color: Colors.white,
-                                strokeWidth: 2.5,
-                              ),
+                                  color: Colors.white, strokeWidth: 2.5),
                             )
                           : Text(
-                              'Sign In',
+                              'Sign Up',
                               style: GoogleFonts.inter(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w600,
@@ -187,105 +191,19 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                 ),
-
                 const SizedBox(height: 24),
-
-                Center(
-                  child: Text(
-                    'Or continue with',
-                    style: GoogleFonts.inter(
-                      fontSize: 13,
-                      color: AppTheme.textLight,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 20),
-
-                // Google sign in
-                Consumer<AuthProvider>(builder: (context, authProvider, child) {
-                  return GestureDetector(
-                    onTap: () async {
-                      try {
-                        await authProvider.signInWithGoogle();
-                        if (authProvider.isAuthenticated && mounted) {
-                          Navigator.of(context).pushAndRemoveUntil(
-                            MaterialPageRoute(
-                                builder: (_) => const MainNavScreen()),
-                            (route) => false,
-                          );
-                        }
-                      } catch (e) {
-                        if (mounted) _showError('Google sign in failed: $e');
-                      }
-                    },
-                    child: Container(
-                      width: double.infinity,
-                      height: 56,
-                      decoration: BoxDecoration(
-                        color: AppTheme.cardWhite,
-                        borderRadius: BorderRadius.circular(AppTheme.radiusXL),
-                        border: Border.all(color: AppTheme.divider, width: 1.5),
-                        boxShadow: AppTheme.cardShadow,
-                      ),
-                      child: authProvider.isLoading
-                          ? const Center(
-                              child: SizedBox(
-                                width: 24,
-                                height: 24,
-                                child: CircularProgressIndicator(
-                                  color: AppTheme.primaryPurple,
-                                  strokeWidth: 2.5,
-                                ),
-                              ),
-                            )
-                          : Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Image.network(
-                                  'https://cdn1.iconfinder.com/data/icons/google_s_logo/128/Google_G_Logo-512.png',
-                                  width: 22,
-                                  height: 22,
-                                  errorBuilder: (context, error, stackTrace) =>
-                                      const Icon(Icons.g_mobiledata_rounded,
-                                          size: 24),
-                                ),
-                                const SizedBox(width: 12),
-                                Flexible(
-                                  child: Text(
-                                    'Continue with Google',
-                                    style: GoogleFonts.inter(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w600,
-                                      color: AppTheme.textDark,
-                                    ),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ],
-                            ),
-                    ),
-                  );
-                }),
-
-                const SizedBox(height: 32),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      'Don\'t have an account? ',
+                      'Already have an account? ',
                       style: GoogleFonts.inter(
                           fontSize: 14, color: AppTheme.textMedium),
                     ),
                     GestureDetector(
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (_) => const SignupScreen()),
-                        );
-                      },
+                      onTap: () => Navigator.pop(context),
                       child: Text(
-                        'Sign Up',
+                        'Sign In',
                         style: GoogleFonts.inter(
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
@@ -295,7 +213,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 32),
               ],
             ),
           ),

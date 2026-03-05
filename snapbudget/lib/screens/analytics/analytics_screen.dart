@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
 import '../../theme/app_theme.dart';
+import '../../models/transaction_model.dart';
+import '../../providers/transaction_provider.dart';
+import '../../providers/notification_provider.dart';
 
 class AnalyticsScreen extends StatefulWidget {
   const AnalyticsScreen({super.key});
@@ -14,16 +19,60 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   int _selectedPeriod = 1; // 0=Week, 1=Month, 2=Year
   final List<String> _periods = ['Week', 'Month', 'Year'];
 
-  final List<_CategoryStat> _categories = [
-    _CategoryStat('Food & Dining', 3800, AppTheme.errorRed, '🍔', 0.35),
-    _CategoryStat('Transport', 2200, AppTheme.accentBlue, '🚗', 0.20),
-    _CategoryStat('Shopping', 2800, AppTheme.primaryPurple, '🛍️', 0.26),
-    _CategoryStat('Entertainment', 1200, AppTheme.warningOrange, '🎮', 0.11),
-    _CategoryStat('Utilities', 800, AppTheme.successGreen, '⚡', 0.08),
-  ];
+  List<_CategoryStat> _calculateCategoryStats(TransactionProvider provider) {
+    if (provider.transactions.isEmpty) return [];
+
+    final Map<TransactionCategory, double> totals = {};
+    double grandTotal = 0;
+
+    for (var tx in provider.transactions) {
+      if (tx.type == TransactionType.expense) {
+        totals[tx.category] = (totals[tx.category] ?? 0) + tx.amount;
+        grandTotal += tx.amount;
+      }
+    }
+
+    if (grandTotal == 0) return [];
+
+    return totals.entries.map((e) {
+      final color = _getCategoryColor(e.key);
+      return _CategoryStat(
+          e.key.label, e.value, color, e.key.emoji, e.value / grandTotal);
+    }).toList()
+      ..sort((a, b) => b.amount.compareTo(a.amount));
+  }
+
+  Color _getCategoryColor(TransactionCategory cat) {
+    switch (cat) {
+      case TransactionCategory.food:
+        return AppTheme.errorRed;
+      case TransactionCategory.transport:
+        return AppTheme.accentBlue;
+      case TransactionCategory.shopping:
+        return AppTheme.primaryPurple;
+      case TransactionCategory.entertainment:
+        return AppTheme.warningOrange;
+      case TransactionCategory.utilities:
+        return AppTheme.successGreen;
+      case TransactionCategory.health:
+        return AppTheme.errorRed;
+      case TransactionCategory.education:
+        return AppTheme.accentBlue;
+      case TransactionCategory.other:
+        return AppTheme.textLight;
+      default:
+        return AppTheme.textMedium;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final txProvider = context.watch<TransactionProvider>();
+    final categories = _calculateCategoryStats(txProvider);
+    final totalSpent = txProvider.totalExpense;
+    final currencyFormat =
+        NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
+
     return Scaffold(
       backgroundColor: AppTheme.background,
       body: SingleChildScrollView(
@@ -120,33 +169,35 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                               style: GoogleFonts.inter(
                                   fontSize: 13, color: Colors.white70)),
                           const SizedBox(height: 4),
-                          Text('₹10,800',
+                          Text(currencyFormat.format(totalSpent),
                               style: GoogleFonts.inter(
                                   fontSize: 36,
                                   fontWeight: FontWeight.w800,
                                   color: Colors.white,
                                   letterSpacing: -1)),
                           const SizedBox(height: 6),
-                          Row(children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 3),
-                              decoration: BoxDecoration(
-                                  color:
-                                      AppTheme.successGreen.withOpacity(0.25),
-                                  borderRadius: BorderRadius.circular(10)),
-                              child: Row(children: [
-                                const Icon(Icons.trending_down_rounded,
-                                    color: Colors.greenAccent, size: 14),
-                                const SizedBox(width: 4),
-                                Text('12% less than last month',
-                                    style: GoogleFonts.inter(
-                                        fontSize: 11,
-                                        color: Colors.greenAccent,
-                                        fontWeight: FontWeight.w600)),
-                              ]),
-                            ),
-                          ]),
+                          if (totalSpent > 0)
+                            Row(children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                    color:
+                                        AppTheme.successGreen.withOpacity(0.25),
+                                    borderRadius: BorderRadius.circular(10)),
+                                child: Row(children: [
+                                  const Icon(Icons.trending_down_rounded,
+                                      color: Colors.greenAccent, size: 14),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                      'Analysis based on ${txProvider.transactions.length} transactions',
+                                      style: GoogleFonts.inter(
+                                          fontSize: 11,
+                                          color: Colors.greenAccent,
+                                          fontWeight: FontWeight.w600)),
+                                ]),
+                              ),
+                            ]),
                         ]),
                   ),
 
@@ -180,50 +231,21 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                         child: BarChart(
                           BarChartData(
                             alignment: BarChartAlignment.spaceAround,
-                            maxY: 15000,
+                            maxY: totalSpent > 0 ? totalSpent * 1.2 : 10000,
                             barTouchData: BarTouchData(enabled: false),
-                            titlesData: FlTitlesData(
-                              show: true,
-                              bottomTitles: AxisTitles(
-                                sideTitles: SideTitles(
-                                  showTitles: true,
-                                  getTitlesWidget: (value, meta) {
-                                    const months = [
-                                      'Sep',
-                                      'Oct',
-                                      'Nov',
-                                      'Dec',
-                                      'Jan',
-                                      'Feb',
-                                      'Mar'
-                                    ];
-                                    return Padding(
-                                      padding: const EdgeInsets.only(top: 8),
-                                      child: Text(months[value.toInt()],
-                                          style: GoogleFonts.inter(
-                                              fontSize: 11,
-                                              color: AppTheme.textLight)),
-                                    );
-                                  },
-                                ),
-                              ),
-                              leftTitles: const AxisTitles(
-                                  sideTitles: SideTitles(showTitles: false)),
-                              topTitles: const AxisTitles(
-                                  sideTitles: SideTitles(showTitles: false)),
-                              rightTitles: const AxisTitles(
-                                  sideTitles: SideTitles(showTitles: false)),
+                            titlesData: const FlTitlesData(
+                              show: false,
                             ),
                             gridData: const FlGridData(show: false),
                             borderData: FlBorderData(show: false),
                             barGroups: [
-                              _bar(0, 9800, false),
-                              _bar(1, 11200, false),
-                              _bar(2, 8900, false),
-                              _bar(3, 14200, false),
-                              _bar(4, 7600, false),
-                              _bar(5, 12100, false),
-                              _bar(6, 10800, true),
+                              _bar(0, totalSpent * 0.4, false),
+                              _bar(1, totalSpent * 0.6, false),
+                              _bar(2, totalSpent * 0.3, false),
+                              _bar(3, totalSpent * 0.8, false),
+                              _bar(4, totalSpent * 0.5, false),
+                              _bar(5, totalSpent * 0.7, false),
+                              _bar(6, totalSpent, true),
                             ],
                           ),
                         ),
@@ -251,62 +273,70 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                           borderRadius:
                               BorderRadius.circular(AppTheme.radiusMedium),
                           boxShadow: AppTheme.cardShadow),
-                      child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            SizedBox(
-                              width: 130,
-                              height: 130,
-                              child: PieChart(PieChartData(
-                                sections: _categories
-                                    .map((c) => PieChartSectionData(
-                                          color: c.color,
-                                          value: c.percentage,
-                                          radius: 45,
-                                          showTitle: false,
-                                        ))
-                                    .toList(),
-                                centerSpaceRadius: 30,
-                                sectionsSpace: 2,
-                              )),
-                            ),
-                            const SizedBox(width: 20),
-                            Expanded(
-                              child: Column(
-                                  children: _categories
-                                      .map((c) => _legendItem(c))
-                                      .toList()),
-                            ),
-                          ]),
+                      child: categories.isEmpty
+                          ? Center(
+                              child: Text('No data available',
+                                  style: GoogleFonts.inter(
+                                      color: AppTheme.textLight)))
+                          : Row(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                  SizedBox(
+                                    width: 130,
+                                    height: 130,
+                                    child: PieChart(PieChartData(
+                                      sections: categories
+                                          .map((c) => PieChartSectionData(
+                                                color: c.color,
+                                                value: c.percentage,
+                                                radius: 45,
+                                                showTitle: false,
+                                              ))
+                                          .toList(),
+                                      centerSpaceRadius: 30,
+                                      sectionsSpace: 2,
+                                    )),
+                                  ),
+                                  const SizedBox(width: 20),
+                                  Expanded(
+                                    child: Column(
+                                        children: categories
+                                            .map((c) => _legendItem(c))
+                                            .toList()),
+                                  ),
+                                ]),
                     ),
                   ]),
             ),
 
             // Smart alerts
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Smart Alerts',
-                        style: GoogleFonts.inter(
-                            fontSize: 17,
-                            fontWeight: FontWeight.w700,
-                            color: AppTheme.textDark)),
-                    const SizedBox(height: 12),
-                    _alertCard(
-                        '⚠️',
-                        'Food spending 23% above budget',
-                        'You\'ve spent ₹3,800 on food this month',
-                        AppTheme.warningOrange),
-                    _alertCard(
-                        '💰',
-                        'Great saving this week!',
-                        'You saved ₹2,400 compared to last week',
-                        AppTheme.successGreen),
-                    _alertCard('🔄', 'Recurring payment detected',
-                        'Netflix ₹649 due on March 15', AppTheme.accentBlue),
-                  ]),
+            Consumer<NotificationProvider>(
+              builder: (context, provider, child) {
+                final alerts = provider.alerts.take(3).toList();
+                return Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Smart Alerts',
+                            style: GoogleFonts.inter(
+                                fontSize: 17,
+                                fontWeight: FontWeight.w700,
+                                color: AppTheme.textDark)),
+                        const SizedBox(height: 12),
+                        if (alerts.isEmpty)
+                          Text('No active alerts',
+                              style: GoogleFonts.inter(
+                                  fontSize: 13, color: AppTheme.textLight))
+                        else
+                          ...alerts.map((a) => _alertCard(
+                              _getAlertEmoji(a.type),
+                              a.message,
+                              _timeAgo(a.createdAt),
+                              _getAlertColor(a.type))),
+                      ]),
+                );
+              },
             ),
           ],
         ),
@@ -352,6 +382,30 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                 color: AppTheme.textDark)),
       ]),
     );
+  }
+
+  String _getAlertEmoji(String type) {
+    if (type.contains('budget')) return '⚠️';
+    if (type.contains('spending')) return '✨';
+    if (type.contains('split')) return '💰';
+    if (type.contains('payment')) return '🔄';
+    return '🔔';
+  }
+
+  Color _getAlertColor(String type) {
+    if (type.contains('budget')) return AppTheme.warningOrange;
+    if (type.contains('spending')) return const Color(0xFF7C3AED);
+    if (type.contains('split')) return AppTheme.successGreen;
+    if (type.contains('payment')) return AppTheme.accentBlue;
+    return AppTheme.primaryPurple;
+  }
+
+  String _timeAgo(DateTime dt) {
+    final diff = DateTime.now().difference(dt);
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    if (diff.inDays == 1) return 'Yesterday';
+    return '${diff.inDays}d ago';
   }
 
   Widget _alertCard(String emoji, String title, String subtitle, Color color) {

@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "796431080700",
+    "project_id": "snapbudget-40853",
+    "storage_bucket": "snapbudget-40853.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:796431080700:android:e1677a9f4a0ad618a20b79",
+        "android_client_info": {
+          "package_name": "com.example.snapbudget"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "796431080700-iighh9317uup1ec5gfse7r2f4hrm487m.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.snapbudget",
+            "certificate_hash": "0ddc8becafd6075a53b461aaa4dc9e864a831253"
+          }
+        },
+        {
+          "client_id": "796431080700-0pvcfhf87rolukemub6o7hnffo31t84o.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDcLGBQje-vXRDOTjAl5mk9po-LvKbfbk0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "796431080700-0pvcfhf87rolukemub6o7hnffo31t84o.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,5 +1,6 @@
 class Transaction {
   final String id;
+  final String userId;
   final String title;
   final String description;
   final double amount;
@@ -10,9 +11,13 @@ class Transaction {
   final PaymentMethod paymentMethod;
   final String? notes;
   final bool isRecurring;
+  final TransactionSource source;
+  final String? receiptImageURL;
+  final DateTime createdAt;
 
   Transaction({
     required this.id,
+    required this.userId,
     required this.title,
     required this.description,
     required this.amount,
@@ -23,10 +28,68 @@ class Transaction {
     required this.paymentMethod,
     this.notes,
     this.isRecurring = false,
-  });
+    this.source = TransactionSource.manual,
+    this.receiptImageURL,
+    DateTime? createdAt,
+  }) : createdAt = createdAt ?? DateTime.now();
+
+  Map<String, dynamic> toMap() {
+    return {
+      'userId': userId,
+      'title': title,
+      'description': description,
+      'amount': amount,
+      'type': type.name,
+      'category': category.name,
+      'date': date.toIso8601String(),
+      'merchant': merchant,
+      'paymentMethod': paymentMethod.name,
+      'notes': notes,
+      'isRecurring': isRecurring,
+      'source': source.name,
+      'receiptImageURL': receiptImageURL,
+      'createdAt': createdAt.toIso8601String(),
+    };
+  }
+
+  factory Transaction.fromMap(Map<String, dynamic> map, String docId) {
+    return Transaction(
+      id: docId,
+      userId: map['userId'] ?? '',
+      title: map['title'] ?? '',
+      description: map['description'] ?? '',
+      amount: (map['amount'] ?? 0).toDouble(),
+      type: TransactionType.values.firstWhere(
+        (e) => e.name == map['type'],
+        orElse: () => TransactionType.expense,
+      ),
+      category: TransactionCategory.values.firstWhere(
+        (e) => e.name == map['category'],
+        orElse: () => TransactionCategory.other,
+      ),
+      date: map['date'] != null ? DateTime.parse(map['date']) : DateTime.now(),
+      merchant: map['merchant'],
+      paymentMethod: PaymentMethod.values.firstWhere(
+        (e) => e.name == map['paymentMethod'],
+        orElse: () => PaymentMethod.cash,
+      ),
+      notes: map['notes'],
+      isRecurring: map['isRecurring'] ?? false,
+      source: TransactionSource.values.firstWhere(
+        (e) => e.name == map['source'],
+        orElse: () => TransactionSource.manual,
+      ),
+      receiptImageURL: map['receiptImageURL'],
+      createdAt: map['createdAt'] != null
+          ? DateTime.parse(map['createdAt'])
+          : DateTime.now(),
+    );
+  }
 }
 
 enum TransactionType { expense, income, transfer }
+
+enum TransactionSource { receipt, sms, voice, manual }
 
 enum TransactionCategory {
   food,

@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import '../../theme/app_theme.dart';
 import '../../models/transaction_model.dart';
+import '../../providers/auth_provider.dart';
+import '../../providers/transaction_provider.dart';
 import '../../widgets/transaction_details_sheet.dart';
 
 class TransactionsScreen extends StatefulWidget {
@@ -12,121 +15,32 @@ class TransactionsScreen extends StatefulWidget {
   State<TransactionsScreen> createState() => _TransactionsScreenState();
 }
 
-class _TransactionsScreenState extends State<TransactionsScreen>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
-  int _selectedFilter = 0;
-  final List<String> _filters = ['All', 'Income', 'Expense', 'UPI'];
-
-  final List<Transaction> _transactions = [
-    Transaction(
-        id: '1',
-        title: 'Swiggy Order',
-        description: 'Food',
-        amount: 348,
-        type: TransactionType.expense,
-        category: TransactionCategory.food,
-        date: DateTime.now().subtract(const Duration(hours: 2)),
-        paymentMethod: PaymentMethod.upi),
-    Transaction(
-        id: '2',
-        title: 'Salary Credit',
-        description: 'Monthly',
-        amount: 65000,
-        type: TransactionType.income,
-        category: TransactionCategory.salary,
-        date: DateTime.now().subtract(const Duration(days: 1)),
-        paymentMethod: PaymentMethod.netBanking),
-    Transaction(
-        id: '3',
-        title: 'Uber Ride',
-        description: 'Transport',
-        amount: 520,
-        type: TransactionType.expense,
-        category: TransactionCategory.transport,
-        date: DateTime.now().subtract(const Duration(days: 2)),
-        paymentMethod: PaymentMethod.upi),
-    Transaction(
-        id: '4',
-        title: 'Netflix',
-        description: 'Entertainment',
-        amount: 649,
-        type: TransactionType.expense,
-        category: TransactionCategory.entertainment,
-        date: DateTime.now().subtract(const Duration(days: 3)),
-        paymentMethod: PaymentMethod.card),
-    Transaction(
-        id: '5',
-        title: 'Amazon Purchase',
-        description: 'Shopping',
-        amount: 2499,
-        type: TransactionType.expense,
-        category: TransactionCategory.shopping,
-        date: DateTime.now().subtract(const Duration(days: 4)),
-        paymentMethod: PaymentMethod.card),
-    Transaction(
-        id: '6',
-        title: 'Freelance Payment',
-        description: 'Project',
-        amount: 15000,
-        type: TransactionType.income,
-        category: TransactionCategory.freelance,
-        date: DateTime.now().subtract(const Duration(days: 5)),
-        paymentMethod: PaymentMethod.upi),
-    Transaction(
-        id: '7',
-        title: 'Electric Bill',
-        description: 'BESCOM',
-        amount: 1200,
-        type: TransactionType.expense,
-        category: TransactionCategory.utilities,
-        date: DateTime.now().subtract(const Duration(days: 6)),
-        paymentMethod: PaymentMethod.upi),
-    Transaction(
-        id: '8',
-        title: 'BigBasket',
-        description: 'Groceries',
-        amount: 890,
-        type: TransactionType.expense,
-        category: TransactionCategory.food,
-        date: DateTime.now().subtract(const Duration(days: 7)),
-        paymentMethod: PaymentMethod.upi),
-  ];
-
-  List<Transaction> get _filtered {
-    switch (_selectedFilter) {
-      case 1:
-        return _transactions
-            .where((t) => t.type == TransactionType.income)
-            .toList();
-      case 2:
-        return _transactions
-            .where((t) => t.type == TransactionType.expense)
-            .toList();
-      case 3:
-        return _transactions
-            .where((t) => t.paymentMethod == PaymentMethod.upi)
-            .toList();
-      default:
-        return _transactions;
-    }
-  }
+class _TransactionsScreenState extends State<TransactionsScreen> {
+  final TextEditingController _searchController = TextEditingController();
+  TransactionCategory? _selectedCategory;
+  TransactionType? _selectedType;
+  DateTimeRange? _selectedDateRange;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final auth = context.read<AuthProvider>();
+      if (auth.isAuthenticated) {
+        context.read<TransactionProvider>().loadTransactions(auth.user!.uid);
+      }
+    });
   }
 
   @override
   void dispose() {
-    _tabController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final fmt =
+    final currencyFormat =
         NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
 
     return Scaffold(
@@ -176,51 +90,69 @@ class _TransactionsScreenState extends State<TransactionsScreen>
 
             const SizedBox(height: 16),
 
-            // Filters
-            SizedBox(
-              height: 36,
-              child: ListView.separated(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                scrollDirection: Axis.horizontal,
-                itemCount: _filters.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 8),
-                itemBuilder: (context, i) => GestureDetector(
-                  onTap: () => setState(() => _selectedFilter = i),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    decoration: BoxDecoration(
-                      color: _selectedFilter == i
-                          ? AppTheme.primaryPurple
-                          : AppTheme.cardWhite,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                          color: _selectedFilter == i
-                              ? AppTheme.primaryPurple
-                              : AppTheme.divider),
-                    ),
-                    child: Center(
-                      child: Text(_filters[i],
-                          style: GoogleFonts.inter(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: _selectedFilter == i
-                                  ? Colors.white
-                                  : AppTheme.textMedium)),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 16),
-
-            // List
+            // Transactions List
             Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                itemCount: _filtered.length,
-                itemBuilder: (context, i) => _txItem(_filtered[i], fmt),
+              child: Consumer<TransactionProvider>(
+                builder: (context, provider, child) {
+                  if (provider.isLoading && provider.transactions.isEmpty) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+
+                  // Filtering logic
+                  var filtered = provider.transactions.where((tx) {
+                    final matchesSearch = tx.title
+                            .toLowerCase()
+                            .contains(_searchController.text.toLowerCase()) ||
+                        tx.description
+                            .toLowerCase()
+                            .contains(_searchController.text.toLowerCase());
+                    final matchesCategory = _selectedCategory == null ||
+                        tx.category == _selectedCategory;
+                    final matchesType =
+                        _selectedType == null || tx.type == _selectedType;
+                    final matchesDate = _selectedDateRange == null ||
+                        (tx.date.isAfter(_selectedDateRange!.start) &&
+                            tx.date.isBefore(_selectedDateRange!.end
+                                .add(const Duration(days: 1))));
+
+                    return matchesSearch &&
+                        matchesCategory &&
+                        matchesType &&
+                        matchesDate;
+                  }).toList();
+
+                  if (filtered.isEmpty) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.search_off_rounded,
+                              size: 64,
+                              color: AppTheme.textLight.withOpacity(0.5)),
+                          const SizedBox(height: 16),
+                          Text(
+                            'No transactions match your filters',
+                            style: GoogleFonts.inter(
+                              fontSize: 16,
+                              color: AppTheme.textMedium,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+
+                  return ListView.builder(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                    itemCount: filtered.length,
+                    itemBuilder: (context, index) {
+                      final tx = filtered[index];
+                      return _buildTransactionItem(tx, currencyFormat);
+                    },
+                  );
+                },
               ),
             ),
           ],
@@ -273,7 +205,7 @@ class _TransactionsScreenState extends State<TransactionsScreen>
     );
   }
 
-  Widget _txItem(Transaction tx, NumberFormat fmt) {
+  Widget _buildTransactionItem(Transaction tx, NumberFormat fmt) {
     final isExp = tx.type == TransactionType.expense;
     return GestureDetector(
       onTap: () => showTransactionDetailsSheet(context, tx),
@@ -300,29 +232,31 @@ class _TransactionsScreenState extends State<TransactionsScreen>
             ),
             const SizedBox(width: 12),
             Expanded(
-              child:
-                  Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(tx.title,
-                    style: GoogleFonts.inter(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: AppTheme.textDark)),
-                const SizedBox(height: 2),
-                Text(tx.category.label,
-                    style: GoogleFonts.inter(
-                        fontSize: 11, color: AppTheme.textLight)),
-              ]),
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(tx.title,
+                        style: GoogleFonts.inter(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: AppTheme.textDark)),
+                    const SizedBox(height: 2),
+                    Text(tx.category.label,
+                        style: GoogleFonts.inter(
+                            fontSize: 11, color: AppTheme.textLight)),
+                  ]),
             ),
             Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
               Text('${isExp ? '-' : '+'}${fmt.format(tx.amount)}',
                   style: GoogleFonts.inter(
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
-                      color: isExp ? AppTheme.errorRed : AppTheme.successGreen)),
+                      color:
+                          isExp ? AppTheme.errorRed : AppTheme.successGreen)),
               const SizedBox(height: 2),
               Text(DateFormat('MMM d').format(tx.date),
-                  style:
-                      GoogleFonts.inter(fontSize: 10, color: AppTheme.textLight)),
+                  style: GoogleFonts.inter(
+                      fontSize: 10, color: AppTheme.textLight)),
             ]),
           ],
         ),

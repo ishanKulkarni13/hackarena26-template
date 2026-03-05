@@ -3,6 +3,11 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../../theme/app_theme.dart';
 import '../../models/split_bill_model.dart';
+import '../../providers/auth_provider.dart';
+import '../../providers/split_provider.dart';
+import '../../models/split_group_model.dart';
+import '../../models/group_expense_model.dart';
+import 'package:provider/provider.dart';
 
 class SplitSyncScreen extends StatefulWidget {
   const SplitSyncScreen({super.key});
@@ -15,59 +20,19 @@ class _SplitSyncScreenState extends State<SplitSyncScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
-  final List<SplitBill> _bills = [
-    SplitBill(
-      id: '1',
-      title: 'Goa Trip 🏖️',
-      totalAmount: 12500,
-      date: DateTime.now().subtract(const Duration(days: 3)),
-      description: 'Hotel + Food + Activities',
-      status: SplitStatus.partial,
-      expenseBreakdown: {
-        'Hotel': 6000,
-        'Food': 4000,
-        'Activities': 2500,
-      },
-      members: [
-        SplitMember(id: 'a', name: 'You', share: 3125, hasPaid: true),
-        SplitMember(id: 'b', name: 'Priya', share: 3125, hasPaid: true),
-        SplitMember(id: 'c', name: 'Karan', share: 3125, hasPaid: false),
-        SplitMember(id: 'd', name: 'Riya', share: 3125, hasPaid: false),
-      ],
-    ),
-    SplitBill(
-      id: '2',
-      title: 'Dinner at Punjab Grill 🍽️',
-      totalAmount: 3200,
-      date: DateTime.now().subtract(const Duration(days: 7)),
-      description: 'Team dinner',
-      status: SplitStatus.settled,
-      members: [
-        SplitMember(id: 'a', name: 'You', share: 1067, hasPaid: true),
-        SplitMember(id: 'b', name: 'Amit', share: 1067, hasPaid: true),
-        SplitMember(id: 'c', name: 'Sneha', share: 1066, hasPaid: true),
-      ],
-    ),
-    SplitBill(
-      id: '3',
-      title: 'Netflix Family Plan 📺',
-      totalAmount: 649,
-      date: DateTime.now().subtract(const Duration(days: 2)),
-      description: 'Monthly subscription split',
-      status: SplitStatus.pending,
-      members: [
-        SplitMember(id: 'a', name: 'You', share: 163, hasPaid: true),
-        SplitMember(id: 'b', name: 'Raj', share: 162, hasPaid: false),
-        SplitMember(id: 'c', name: 'Meera', share: 162, hasPaid: false),
-        SplitMember(id: 'd', name: 'Arjun', share: 162, hasPaid: false),
-      ],
-    ),
-  ];
-
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+
+    // Load data from provider
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      if (authProvider.isAuthenticated) {
+        Provider.of<SplitProvider>(context, listen: false)
+            .loadGroups(authProvider.user!.uid);
+      }
+    });
   }
 
   @override
@@ -81,6 +46,36 @@ class _SplitSyncScreenState extends State<SplitSyncScreen>
 
   @override
   Widget build(BuildContext context) {
+    final splitProvider = Provider.of<SplitProvider>(context);
+    final authProvider = Provider.of<AuthProvider>(context);
+    final userId = authProvider.user?.uid ?? '';
+
+    // Calculate dynamic stats
+    double youOwe = 0;
+    double owedToYou = 0;
+    double settled = 0;
+
+    for (final group in splitProvider.groups) {
+      final expenses = splitProvider.getExpenses(group.groupId);
+      for (final exp in expenses) {
+        if (exp.status == ExpenseStatus.settled) {
+          if (exp.paidBy == userId || exp.splitMembers.contains(userId)) {
+            settled += exp.amount;
+          }
+          continue;
+        }
+
+        final perPerson = exp.amount / exp.splitMembers.length;
+        if (exp.paidBy == userId) {
+          // Others owe you
+          owedToYou += perPerson * (exp.splitMembers.length - 1);
+        } else if (exp.splitMembers.contains(userId)) {
+          // You owe payer
+          youOwe += perPerson;
+        }
+      }
+    }
+
     return Scaffold(
       backgroundColor: AppTheme.background,
       body: SafeArea(
@@ -129,15 +124,16 @@ class _SplitSyncScreenState extends State<SplitSyncScreen>
               child: Row(
                 children: [
                   Expanded(
-                      child: _statCard('You Owe', '₹6,250', AppTheme.errorRed)),
+                      child: _statCard(
+                          'You Owe', _fmt.format(youOwe), AppTheme.errorRed)),
                   const SizedBox(width: 12),
                   Expanded(
-                      child: _statCard(
-                          'Owed to You', '₹3,200', AppTheme.successGreen)),
+                      child: _statCard('Owed to You', _fmt.format(owedToYou),
+                          AppTheme.successGreen)),
                   const SizedBox(width: 12),
                   Expanded(
-                      child: _statCard(
-                          'Settled', '₹3,200', AppTheme.primaryPurple)),
+                      child: _statCard('Settled', _fmt.format(settled),
+                          AppTheme.primaryPurple)),
                 ],
               ),
             ),
@@ -180,11 +176,18 @@ class _SplitSyncScreenState extends State<SplitSyncScreen>
               child: TabBarView(
                 controller: _tabController,
                 children: [
-                  ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    itemCount: _bills.length,
-                    itemBuilder: (context, i) => _billCard(_bills[i], i),
-                  ),
+                  splitProvider.isLoading
+                      ? const Center(child: CircularProgressIndicator())
+                      : splitProvider.groups.isEmpty
+                          ? _buildEmptyState('No groups yet',
+                              'Create a group to start splitting bills')
+                          : ListView.builder(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 20),
+                              itemCount: splitProvider.groups.length,
+                              itemBuilder: (context, i) =>
+                                  _groupCard(splitProvider.groups[i], i),
+                            ),
                   _buildFriendsList(),
                 ],
               ),
@@ -215,30 +218,17 @@ class _SplitSyncScreenState extends State<SplitSyncScreen>
     );
   }
 
-  Widget _billCard(SplitBill bill, int index) {
-    final settled = bill.members.where((m) => m.hasPaid).length;
-    final total = bill.members.length;
-    final progress = settled / total;
-
-    Color statusColor;
-    String statusLabel;
-    switch (bill.status) {
-      case SplitStatus.settled:
-        statusColor = AppTheme.successGreen;
-        statusLabel = 'Settled';
-        break;
-      case SplitStatus.partial:
-        statusColor = AppTheme.warningOrange;
-        statusLabel = 'Partial';
-        break;
-      case SplitStatus.pending:
-        statusColor = AppTheme.errorRed;
-        statusLabel = 'Pending';
-        break;
-    }
+  Widget _groupCard(SplitGroupModel group, int index) {
+    final expenses = Provider.of<SplitProvider>(context, listen: false)
+        .getExpenses(group.groupId);
+    final totalAmount = expenses.fold(0.0, (sum, exp) => sum + exp.amount);
+    final settledCount =
+        expenses.where((exp) => exp.status == ExpenseStatus.settled).length;
+    final totalCount = expenses.length;
+    final progress = totalCount == 0 ? 0.0 : settledCount / totalCount;
 
     return GestureDetector(
-      onTap: () => _showBillDetails(bill),
+      onTap: () => _showGroupDetails(group),
       child: Container(
         margin: const EdgeInsets.only(bottom: 14),
         padding: const EdgeInsets.all(16),
@@ -250,7 +240,7 @@ class _SplitSyncScreenState extends State<SplitSyncScreen>
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
             Expanded(
-              child: Text(bill.title,
+              child: Text(group.groupName,
                   style: GoogleFonts.inter(
                       fontSize: 15,
                       fontWeight: FontWeight.w700,
@@ -259,51 +249,29 @@ class _SplitSyncScreenState extends State<SplitSyncScreen>
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                GestureDetector(
-                  onTap: () => _showEditSplitDialog(bill, index),
-                  child: const Icon(Icons.edit_rounded,
-                      size: 18, color: AppTheme.textMedium),
-                ),
-                const SizedBox(width: 8),
-                GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _bills.removeAt(index);
-                    });
-                  },
-                  child: const Icon(Icons.delete_rounded,
-                      size: 18, color: AppTheme.errorRed),
-                ),
-                const SizedBox(width: 12),
                 Container(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                      color: statusColor.withOpacity(0.1),
+                      color: AppTheme.primaryPurple.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(8)),
-                  child: Text(statusLabel,
+                  child: Text('${group.members.length} members',
                       style: GoogleFonts.inter(
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
-                          color: statusColor)),
+                          color: AppTheme.primaryPurple)),
                 ),
               ],
             ),
           ]),
-          if (bill.description != null) ...[
-            const SizedBox(height: 4),
-            Text(bill.description!,
-                style:
-                    GoogleFonts.inter(fontSize: 12, color: AppTheme.textLight)),
-          ],
           const SizedBox(height: 12),
           Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-            Text('Total: ${_fmt.format(bill.totalAmount)}',
+            Text('Total Expenses: ${_fmt.format(totalAmount)}',
                 style: GoogleFonts.inter(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                     color: AppTheme.textDark)),
-            Text('Per person: ${_fmt.format(bill.amountPerPerson)}',
+            Text('$settledCount/$totalCount settled',
                 style: GoogleFonts.inter(
                     fontSize: 12, color: AppTheme.textMedium)),
           ]),
@@ -314,41 +282,36 @@ class _SplitSyncScreenState extends State<SplitSyncScreen>
               value: progress,
               minHeight: 6,
               backgroundColor: AppTheme.divider,
-              valueColor: AlwaysStoppedAnimation<Color>(statusColor),
+              valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryPurple),
             ),
           ),
-          const SizedBox(height: 8),
-          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-            Text('$settled/$total paid',
-                style:
-                    GoogleFonts.inter(fontSize: 11, color: AppTheme.textLight)),
-            Row(
-                children: bill.members
-                    .take(4)
-                    .map((m) => Container(
-                          width: 26,
-                          height: 26,
-                          margin: const EdgeInsets.only(left: 4),
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: m.hasPaid
-                                ? AppTheme.successGreen
-                                : AppTheme.divider,
-                            border: Border.all(
-                                color: AppTheme.background, width: 1.5),
-                          ),
-                          child: Center(
-                              child: Text(m.name[0],
-                                  style: GoogleFonts.inter(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w700,
-                                      color: m.hasPaid
-                                          ? Colors.white
-                                          : AppTheme.textLight))),
-                        ))
-                    .toList()),
-          ]),
         ]),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(String title, String message) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.group_off_rounded,
+              size: 64, color: AppTheme.textLight.withOpacity(0.5)),
+          const SizedBox(height: 16),
+          Text(title,
+              style: GoogleFonts.inter(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.textMedium)),
+          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 40),
+            child: Text(message,
+                textAlign: TextAlign.center,
+                style:
+                    GoogleFonts.inter(fontSize: 14, color: AppTheme.textLight)),
+          ),
+        ],
       ),
     );
   }
@@ -429,55 +392,16 @@ class _SplitSyncScreenState extends State<SplitSyncScreen>
       isScrollControlled: true,
       builder: (context) => _AddSplitBottomSheet(
         onAdd: (title, amount, members) {
-          setState(() {
-            _bills.insert(
-              0,
-              SplitBill(
-                id: DateTime.now().millisecondsSinceEpoch.toString(),
-                title: title,
-                totalAmount: amount,
-                members: members,
-                date: DateTime.now(),
-                status: members.every((m) => m.hasPaid)
-                    ? SplitStatus.settled
-                    : SplitStatus.pending,
-              ),
-            );
-          });
+          // TODO: Implement group creation via SplitProvider
         },
       ),
     );
   }
 
-  void _showEditSplitDialog(SplitBill bill, int index) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (context) => _AddSplitBottomSheet(
-        initialBill: bill,
-        onAdd: (title, amount, members) {
-          setState(() {
-            _bills[index] = SplitBill(
-              id: bill.id,
-              title: title,
-              totalAmount: amount,
-              members: members,
-              date: bill.date,
-              description: bill.description,
-              expenseBreakdown: bill.expenseBreakdown,
-              status: members.every((m) => m.hasPaid)
-                  ? SplitStatus.settled
-                  : SplitStatus.pending,
-            );
-          });
-        },
-      ),
-    );
-  }
-
-  void _showBillDetails(SplitBill bill) {
-    final billIndex = _bills.indexWhere((b) => b.id == bill.id);
+  void _showGroupDetails(SplitGroupModel group) {
+    final expenses = Provider.of<SplitProvider>(context, listen: false)
+        .getExpenses(group.groupId);
+    final totalAmount = expenses.fold(0.0, (sum, exp) => sum + exp.amount);
 
     showModalBottomSheet(
       context: context,
@@ -493,7 +417,7 @@ class _SplitSyncScreenState extends State<SplitSyncScreen>
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header with title and status
+              // Header with title and members count
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -502,35 +426,17 @@ class _SplitSyncScreenState extends State<SplitSyncScreen>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(bill.title,
+                        Text(group.groupName,
                             style: GoogleFonts.inter(
                                 fontSize: 20,
                                 fontWeight: FontWeight.w800,
                                 color: AppTheme.textDark)),
                         const SizedBox(height: 4),
-                        if (bill.description != null)
-                          Text(bill.description!,
-                              style: GoogleFonts.inter(
-                                  fontSize: 13, color: AppTheme.textMedium)),
+                        Text('${group.members.length} members',
+                            style: GoogleFonts.inter(
+                                fontSize: 13, color: AppTheme.textMedium)),
                       ],
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  // Status badge
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: _getStatusColor(bill.status).withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                          color: _getStatusColor(bill.status).withOpacity(0.3)),
-                    ),
-                    child: Text(_getStatusLabel(bill.status),
-                        style: GoogleFonts.inter(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: _getStatusColor(bill.status))),
                   ),
                 ],
               ),
@@ -542,10 +448,10 @@ class _SplitSyncScreenState extends State<SplitSyncScreen>
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('Total Amount',
+                  Text('Total Group Spending',
                       style: GoogleFonts.inter(
                           fontSize: 14, color: AppTheme.textMedium)),
-                  Text(_fmt.format(bill.totalAmount),
+                  Text(_fmt.format(totalAmount),
                       style: GoogleFonts.inter(
                           fontSize: 16,
                           fontWeight: FontWeight.w700,
@@ -554,17 +460,20 @@ class _SplitSyncScreenState extends State<SplitSyncScreen>
               ),
               const SizedBox(height: 16),
 
-              // Expense Breakdown (if available)
-              if (bill.expenseBreakdown != null &&
-                  bill.expenseBreakdown!.isNotEmpty) ...[
-                Text('Expense Breakdown',
+              // Expenses Section
+              Text('Expenses',
+                  style: GoogleFonts.inter(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.textDark)),
+              const SizedBox(height: 12),
+              if (expenses.isEmpty)
+                Text('No expenses in this group yet',
                     style: GoogleFonts.inter(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: AppTheme.textDark)),
-                const SizedBox(height: 12),
-                ...bill.expenseBreakdown!.entries.map((entry) => Container(
-                      margin: const EdgeInsets.only(bottom: 10),
+                        fontSize: 13, color: AppTheme.textLight))
+              else
+                ...expenses.map((exp) => Container(
+                      margin: const EdgeInsets.only(bottom: 12),
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
                         color: AppTheme.background,
@@ -572,231 +481,46 @@ class _SplitSyncScreenState extends State<SplitSyncScreen>
                         border: Border.all(color: AppTheme.divider),
                       ),
                       child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Row(
-                            children: [
-                              Container(
-                                width: 8,
-                                height: 8,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: _getExpenseCategoryColor(entry.key),
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Text(entry.key,
-                                  style: GoogleFonts.inter(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w600,
-                                      color: AppTheme.textDark)),
-                            ],
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(exp.description,
+                                    style: GoogleFonts.inter(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                        color: AppTheme.textDark)),
+                                const SizedBox(height: 2),
+                                Text(
+                                    exp.status == ExpenseStatus.settled
+                                        ? 'Settled'
+                                        : 'Pending',
+                                    style: GoogleFonts.inter(
+                                        fontSize: 11,
+                                        color:
+                                            exp.status == ExpenseStatus.settled
+                                                ? AppTheme.successGreen
+                                                : AppTheme.errorRed,
+                                        fontWeight: FontWeight.w500)),
+                              ],
+                            ),
                           ),
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
-                              Text(_fmt.format(entry.value),
+                              Text(_fmt.format(exp.amount),
                                   style: GoogleFonts.inter(
-                                      fontSize: 13,
+                                      fontSize: 14,
                                       fontWeight: FontWeight.w700,
                                       color: AppTheme.textDark)),
-                              Text(
-                                  '${((entry.value / bill.totalAmount) * 100).toStringAsFixed(1)}%',
-                                  style: GoogleFonts.inter(
-                                      fontSize: 11,
-                                      color: AppTheme.textMedium)),
                             ],
                           ),
                         ],
                       ),
                     )),
-                const SizedBox(height: 16),
-                const Divider(color: AppTheme.divider),
-                const SizedBox(height: 16),
-              ],
-
-              // Members Section
-              Text('Members & Payments',
-                  style: GoogleFonts.inter(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: AppTheme.textDark)),
-              const SizedBox(height: 12),
-              ...bill.members.map((m) => Container(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppTheme.background,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppTheme.divider),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: m.hasPaid
-                                ? AppTheme.successGreen
-                                : AppTheme.divider,
-                          ),
-                          child: Center(
-                            child: Text(m.name[0].toUpperCase(),
-                                style: GoogleFonts.inter(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w700,
-                                    color: m.hasPaid
-                                        ? Colors.white
-                                        : AppTheme.textLight)),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(m.name,
-                                  style: GoogleFonts.inter(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w600,
-                                      color: AppTheme.textDark)),
-                              const SizedBox(height: 2),
-                              Text(
-                                  m.hasPaid
-                                      ? 'Payment Complete'
-                                      : 'Awaiting Payment',
-                                  style: GoogleFonts.inter(
-                                      fontSize: 11,
-                                      color: m.hasPaid
-                                          ? AppTheme.successGreen
-                                          : AppTheme.errorRed,
-                                      fontWeight: FontWeight.w500)),
-                            ],
-                          ),
-                        ),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Text('₹${m.share.toStringAsFixed(0)}',
-                                style: GoogleFonts.inter(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w700,
-                                    color: AppTheme.textDark)),
-                            const SizedBox(height: 2),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: m.hasPaid
-                                    ? AppTheme.successGreen.withOpacity(0.1)
-                                    : AppTheme.errorRed.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(m.hasPaid ? '✓ Paid' : 'Pending',
-                                  style: GoogleFonts.inter(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w600,
-                                      color: m.hasPaid
-                                          ? AppTheme.successGreen
-                                          : AppTheme.errorRed)),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  )),
               const SizedBox(height: 24),
 
-              // Action Buttons
-              Row(
-                children: [
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () {
-                        Navigator.pop(context);
-                        _showEditSplitDialog(bill, billIndex);
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        decoration: BoxDecoration(
-                          border: Border.all(
-                              color: AppTheme.primaryPurple, width: 2),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(Icons.edit_rounded,
-                                color: AppTheme.primaryPurple, size: 18),
-                            const SizedBox(width: 6),
-                            Text('Edit',
-                                style: GoogleFonts.inter(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                    color: AppTheme.primaryPurple)),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () {
-                        Navigator.pop(context);
-                        showDialog(
-                          context: context,
-                          builder: (context) => AlertDialog(
-                            title: const Text('Delete Split Bill?'),
-                            content:
-                                const Text('This action cannot be undone.'),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.pop(context),
-                                child: const Text('Cancel'),
-                              ),
-                              TextButton(
-                                onPressed: () {
-                                  Navigator.pop(context);
-                                  setState(() {
-                                    _bills.removeAt(billIndex);
-                                  });
-                                },
-                                child: const Text('Delete',
-                                    style: TextStyle(color: Colors.red)),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        decoration: BoxDecoration(
-                          color: AppTheme.errorRed.withOpacity(0.1),
-                          border:
-                              Border.all(color: AppTheme.errorRed, width: 2),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(Icons.delete_rounded,
-                                color: AppTheme.errorRed, size: 18),
-                            const SizedBox(width: 6),
-                            Text('Delete',
-                                style: GoogleFonts.inter(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                    color: AppTheme.errorRed)),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
@@ -821,52 +545,12 @@ class _SplitSyncScreenState extends State<SplitSyncScreen>
       ),
     );
   }
-
-  Color _getStatusColor(SplitStatus status) {
-    switch (status) {
-      case SplitStatus.settled:
-        return AppTheme.successGreen;
-      case SplitStatus.partial:
-        return AppTheme.warningOrange;
-      case SplitStatus.pending:
-        return AppTheme.errorRed;
-    }
-  }
-
-  String _getStatusLabel(SplitStatus status) {
-    switch (status) {
-      case SplitStatus.settled:
-        return 'Settled';
-      case SplitStatus.partial:
-        return 'Partial';
-      case SplitStatus.pending:
-        return 'Pending';
-    }
-  }
-
-  Color _getExpenseCategoryColor(String category) {
-    switch (category.toLowerCase()) {
-      case 'hotel':
-        return const Color(0xFF5B8DEF);
-      case 'food':
-        return const Color(0xFFFFA500);
-      case 'activities':
-        return const Color(0xFFE91E63);
-      case 'transport':
-        return const Color(0xFF4CAF50);
-      case 'entertainment':
-        return const Color(0xFF9C27B0);
-      default:
-        return AppTheme.primaryPurple;
-    }
-  }
 }
 
 class _AddSplitBottomSheet extends StatefulWidget {
   final Function(String title, double amount, List<SplitMember> members) onAdd;
-  final SplitBill? initialBill;
 
-  const _AddSplitBottomSheet({required this.onAdd, this.initialBill});
+  const _AddSplitBottomSheet({required this.onAdd});
 
   @override
   State<_AddSplitBottomSheet> createState() => _AddSplitBottomSheetState();
@@ -884,29 +568,9 @@ class _AddSplitBottomSheetState extends State<_AddSplitBottomSheet> {
   @override
   void initState() {
     super.initState();
-    _titleController =
-        TextEditingController(text: widget.initialBill?.title ?? '');
-    _amountController = TextEditingController(
-        text: widget.initialBill != null
-            ? widget.initialBill!.totalAmount.toStringAsFixed(0)
-            : '');
-
-    // If we're editing, populate members excluding 'You' since 'You' is automatically calculated
-    if (widget.initialBill != null) {
-      _members = widget.initialBill!.members
-          .where((m) => m.name != 'You')
-          .map((m) => SplitMember(
-                id: m.id,
-                name: m.name,
-                share: m.share,
-                hasPaid: m.hasPaid,
-                avatarUrl: m.avatarUrl,
-                upiId: m.upiId,
-              ))
-          .toList();
-    } else {
-      _members = [];
-    }
+    _titleController = TextEditingController();
+    _amountController = TextEditingController();
+    _members = [];
   }
 
   @override
