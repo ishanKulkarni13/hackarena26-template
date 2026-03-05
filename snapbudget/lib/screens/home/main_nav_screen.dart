@@ -53,6 +53,9 @@ class _MainNavScreenState extends State<MainNavScreen>
   }
 
   Widget _buildBottomNav() {
+    final height = MediaQuery.of(context).size.height;
+    final navVerticalPadding = height < 720 ? 6.0 : 10.0;
+
     return Container(
       decoration: BoxDecoration(
         color: AppTheme.cardWhite,
@@ -66,7 +69,7 @@ class _MainNavScreenState extends State<MainNavScreen>
       ),
       child: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 10),
+          padding: EdgeInsets.symmetric(vertical: navVerticalPadding),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: List.generate(_navItems.length, (index) {
@@ -133,7 +136,7 @@ class _MainNavScreenState extends State<MainNavScreen>
       child: Container(
         width: 52,
         height: 52,
-        margin: const EdgeInsets.only(bottom: 4),
+        margin: const EdgeInsets.only(bottom: 2),
         decoration: BoxDecoration(
           gradient: AppTheme.primaryGradient,
           shape: BoxShape.circle,

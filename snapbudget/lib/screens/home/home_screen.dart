@@ -7,6 +7,7 @@ import '../transactions/transactions_screen.dart';
 import '../scan/scan_screen.dart';
 import '../splitsync/splitsync_screen.dart';
 import '../notifications/notifications_screen.dart';
+import '../../widgets/transaction_details_sheet.dart';
 
 class HomeScreen extends StatefulWidget {
   /// Optional callback to switch the bottom-nav tab from within HomeScreen.
@@ -82,6 +83,7 @@ class _HomeScreenState extends State<HomeScreen> {
       symbol: '₹',
       decimalDigits: 0,
     );
+    final bottomInset = MediaQuery.of(context).padding.bottom + 88;
 
     return Scaffold(
       backgroundColor: AppTheme.background,
@@ -101,7 +103,7 @@ class _HomeScreenState extends State<HomeScreen> {
               childCount: _recentTransactions.length,
             ),
           ),
-          const SliverToBoxAdapter(child: SizedBox(height: 24)),
+          SliverToBoxAdapter(child: SizedBox(height: bottomInset)),
         ],
       ),
     );
@@ -583,91 +585,94 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(
-          color: AppTheme.cardWhite,
-          borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
-          boxShadow: AppTheme.cardShadow,
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: isExpense
-                    ? AppTheme.errorRed.withOpacity(0.08)
-                    : AppTheme.successGreen.withOpacity(0.08),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Center(
-                child: Text(
-                  tx.category.emoji,
-                  style: const TextStyle(fontSize: 22),
+      child: GestureDetector(
+        onTap: () => showTransactionDetailsSheet(context, tx),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: AppTheme.cardWhite,
+            borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
+            boxShadow: AppTheme.cardShadow,
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: isExpense
+                      ? AppTheme.errorRed.withOpacity(0.08)
+                      : AppTheme.successGreen.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Center(
+                  child: Text(
+                    tx.category.emoji,
+                    style: const TextStyle(fontSize: 22),
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    tx.title,
-                    style: GoogleFonts.inter(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: AppTheme.textDark,
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      tx.title,
+                      style: GoogleFonts.inter(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.textDark,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 2),
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppTheme.primaryPurple.withOpacity(0.08),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          tx.paymentMethod == PaymentMethod.upi
-                              ? 'UPI'
-                              : tx.paymentMethod == PaymentMethod.card
-                                  ? 'Card'
-                                  : 'Cash',
-                          style: GoogleFonts.inter(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                            color: AppTheme.primaryPurple,
+                    const SizedBox(height: 2),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppTheme.primaryPurple.withOpacity(0.08),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            tx.paymentMethod == PaymentMethod.upi
+                                ? 'UPI'
+                                : tx.paymentMethod == PaymentMethod.card
+                                    ? 'Card'
+                                    : 'Cash',
+                            style: GoogleFonts.inter(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              color: AppTheme.primaryPurple,
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        timeAgo,
-                        style: GoogleFonts.inter(
-                          fontSize: 11,
-                          color: AppTheme.textLight,
+                        const SizedBox(width: 6),
+                        Text(
+                          timeAgo,
+                          style: GoogleFonts.inter(
+                            fontSize: 11,
+                            color: AppTheme.textLight,
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                ],
+                      ],
+                    ),
+                  ],
+                ),
               ),
-            ),
-            Text(
-              amountStr,
-              style: GoogleFonts.inter(
-                fontSize: 15,
-                fontWeight: FontWeight.w700,
-                color: isExpense ? AppTheme.errorRed : AppTheme.successGreen,
+              Text(
+                amountStr,
+                style: GoogleFonts.inter(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: isExpense ? AppTheme.errorRed : AppTheme.successGreen,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
