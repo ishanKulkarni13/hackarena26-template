@@ -18,13 +18,7 @@ class _MainNavScreenState extends State<MainNavScreen>
     with TickerProviderStateMixin {
   int _selectedIndex = 0;
 
-  final List<Widget> _screens = [
-    const HomeScreen(),
-    const SplitSyncScreen(),
-    const ScanScreen(),
-    const AnalyticsScreen(),
-    const ProfileScreen(),
-  ];
+  late final List<Widget> _screens;
 
   final List<_NavItem> _navItems = [
     _NavItem(icon: Icons.home_rounded, label: 'Home'),
@@ -33,6 +27,19 @@ class _MainNavScreenState extends State<MainNavScreen>
     _NavItem(icon: Icons.bar_chart_rounded, label: 'Analytics'),
     _NavItem(icon: Icons.person_rounded, label: 'Profile'),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _screens = [
+      HomeScreen(
+          onTabChange: (index) => setState(() => _selectedIndex = index)),
+      const SplitSyncScreen(),
+      const ScanScreen(),
+      const AnalyticsScreen(),
+      const ProfileScreen(),
+    ];
+  }
 
   @override
   Widget build(BuildContext context) {

@@ -4,9 +4,14 @@ import 'package:intl/intl.dart';
 import '../../theme/app_theme.dart';
 import '../../models/transaction_model.dart';
 import '../transactions/transactions_screen.dart';
+import '../scan/scan_screen.dart';
+import '../splitsync/splitsync_screen.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  /// Optional callback to switch the bottom-nav tab from within HomeScreen.
+  final void Function(int index)? onTabChange;
+
+  const HomeScreen({super.key, this.onTabChange});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -331,55 +336,176 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildQuickActions() {
-    final actions = [
-      _QuickAction('Send', Icons.send_rounded, AppTheme.primaryPurple),
-      _QuickAction('Receive', Icons.download_rounded, AppTheme.accentBlue),
-      _QuickAction(
-          'Scan', Icons.document_scanner_rounded, const Color(0xFF10B981)),
-      _QuickAction('More', Icons.grid_view_rounded, const Color(0xFFF59E0B)),
-    ];
-
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+      padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Quick Actions',
+            style: GoogleFonts.inter(
+              fontSize: 17,
+              fontWeight: FontWeight.w700,
+              color: AppTheme.textDark,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: _buildPrimaryActionItem(
+                  'Scan\nReceipt',
+                  Icons.document_scanner_rounded,
+                  () {
+                    if (widget.onTabChange != null) {
+                      widget.onTabChange!(2); // Scan tab
+                    } else {
+                      Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const ScanScreen()));
+                    }
+                  },
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildSecondaryActionItem(
+                  'Voice',
+                  Icons.mic_rounded,
+                  AppTheme.primaryPurple,
+                  () {
+                    if (widget.onTabChange != null) {
+                      widget.onTabChange!(2); // Scan tab (voice mode)
+                    } else {
+                      Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const ScanScreen()));
+                    }
+                  },
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildSecondaryActionItem(
+                  'Manual',
+                  Icons.edit_rounded,
+                  const Color(0xFFF59E0B),
+                  () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const TransactionsScreen()),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildSecondaryActionItem(
+                  'Split',
+                  Icons.call_split_rounded,
+                  const Color(0xFF10B981),
+                  () {
+                    if (widget.onTabChange != null) {
+                      widget.onTabChange!(1); // SplitSync tab
+                    } else {
+                      Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const SplitSyncScreen()));
+                    }
+                  },
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPrimaryActionItem(
+      String label, IconData icon, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 20),
+        height: 105,
         decoration: BoxDecoration(
-          color: AppTheme.cardWhite,
-          borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
-          boxShadow: AppTheme.cardShadow,
+          color: AppTheme.primaryPurple,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: AppTheme.primaryPurple.withOpacity(0.3),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: actions.map((a) => _buildQuickActionItem(a)).toList(),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withOpacity(0.2),
+              ),
+              child: Icon(icon, color: Colors.white, size: 20),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+                height: 1.2,
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildQuickActionItem(_QuickAction action) {
+  Widget _buildSecondaryActionItem(
+      String label, IconData icon, Color color, VoidCallback onTap) {
     return GestureDetector(
-      onTap: () {},
-      child: Column(
-        children: [
-          Container(
-            width: 52,
-            height: 52,
-            decoration: BoxDecoration(
-              color: action.color.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(16),
+      onTap: onTap,
+      child: Container(
+        height: 105,
+        decoration: BoxDecoration(
+          color: AppTheme.cardWhite,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: AppTheme.cardShadow,
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: color.withOpacity(0.1),
+              ),
+              child: Icon(icon, color: color, size: 20),
             ),
-            child: Icon(action.icon, color: action.color, size: 22),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            action.label,
-            style: GoogleFonts.inter(
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-              color: AppTheme.textMedium,
+            const SizedBox(height: 8),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: AppTheme.textMedium,
+                height: 1.2,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -591,11 +717,4 @@ class _HomeScreenState extends State<HomeScreen> {
     if (diff.inDays == 1) return 'Yesterday';
     return DateFormat('MMM d').format(date);
   }
-}
-
-class _QuickAction {
-  final String label;
-  final IconData icon;
-  final Color color;
-  const _QuickAction(this.label, this.icon, this.color);
 }
