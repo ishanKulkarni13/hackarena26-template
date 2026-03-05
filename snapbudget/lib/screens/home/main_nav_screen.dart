@@ -11,7 +11,16 @@ import '../analytics/analytics_screen.dart';
 import '../profile/profile_screen.dart';
 
 class MainNavScreen extends StatefulWidget {
-  const MainNavScreen({super.key});
+  final int selectedIndex;
+  const MainNavScreen({super.key, this.selectedIndex = 0});
+
+  /// Helper to navigate to a specific tab from anywhere
+  static void goToTab(BuildContext context, int tabIndex) {
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => MainNavScreen(selectedIndex: tabIndex)),
+      (route) => false,
+    );
+  }
 
   @override
   State<MainNavScreen> createState() => _MainNavScreenState();
@@ -19,7 +28,7 @@ class MainNavScreen extends StatefulWidget {
 
 class _MainNavScreenState extends State<MainNavScreen>
     with TickerProviderStateMixin {
-  int _selectedIndex = 0;
+  late int _selectedIndex;
 
   late final List<Widget> _screens;
 
@@ -34,6 +43,7 @@ class _MainNavScreenState extends State<MainNavScreen>
   @override
   void initState() {
     super.initState();
+    _selectedIndex = widget.selectedIndex;
     _screens = [
       HomeScreen(
           onTabChange: (index) => setState(() => _selectedIndex = index)),
@@ -75,7 +85,7 @@ class _MainNavScreenState extends State<MainNavScreen>
         color: AppTheme.cardWhite,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
+            color: Colors.black.withAlpha((0.08 * 255).toInt()),
             blurRadius: 24,
             offset: const Offset(0, -4),
           ),
@@ -107,7 +117,7 @@ class _MainNavScreenState extends State<MainNavScreen>
                   ),
                   decoration: BoxDecoration(
                     color: isSelected
-                        ? AppTheme.primaryPurple.withOpacity(0.1)
+                        ? AppTheme.primaryPurple.withAlpha((0.1 * 255).toInt())
                         : Colors.transparent,
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -156,7 +166,7 @@ class _MainNavScreenState extends State<MainNavScreen>
           shape: BoxShape.circle,
           boxShadow: [
             BoxShadow(
-              color: AppTheme.primaryPurple.withOpacity(0.4),
+              color: AppTheme.primaryPurple.withAlpha((0.4 * 255).toInt()),
               blurRadius: 12,
               offset: const Offset(0, 4),
             ),
