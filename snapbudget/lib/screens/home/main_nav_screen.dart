@@ -1,0 +1,158 @@
+import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import '../../theme/app_theme.dart';
+import '../home/home_screen.dart';
+import '../transactions/transactions_screen.dart';
+import '../scan/scan_screen.dart';
+import '../splitsync/splitsync_screen.dart';
+import '../analytics/analytics_screen.dart';
+import '../profile/profile_screen.dart';
+
+class MainNavScreen extends StatefulWidget {
+  const MainNavScreen({super.key});
+
+  @override
+  State<MainNavScreen> createState() => _MainNavScreenState();
+}
+
+class _MainNavScreenState extends State<MainNavScreen>
+    with TickerProviderStateMixin {
+  int _selectedIndex = 0;
+
+  final List<Widget> _screens = [
+    const HomeScreen(),
+    const TransactionsScreen(),
+    const ScanScreen(),
+    const SplitSyncScreen(),
+    const AnalyticsScreen(),
+    const ProfileScreen(),
+  ];
+
+  final List<_NavItem> _navItems = [
+    _NavItem(icon: Icons.home_rounded, label: 'Home'),
+    _NavItem(icon: Icons.receipt_long_rounded, label: 'Transactions'),
+    _NavItem(icon: Icons.document_scanner_rounded, label: 'Scan'),
+    _NavItem(icon: Icons.people_rounded, label: 'SplitSync'),
+    _NavItem(icon: Icons.bar_chart_rounded, label: 'Analytics'),
+    _NavItem(icon: Icons.person_rounded, label: 'Profile'),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: IndexedStack(
+        index: _selectedIndex,
+        children: _screens,
+      ),
+      bottomNavigationBar: _buildBottomNav(),
+    );
+  }
+
+  Widget _buildBottomNav() {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppTheme.cardWhite,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 24,
+            offset: const Offset(0, -4),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: List.generate(_navItems.length, (index) {
+              final item = _navItems[index];
+              final isSelected = _selectedIndex == index;
+              final isScan = index == 2;
+
+              if (isScan) {
+                return _buildScanButton(isSelected);
+              }
+
+              return GestureDetector(
+                onTap: () => setState(() => _selectedIndex = index),
+                behavior: HitTestBehavior.opaque,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  curve: Curves.easeInOut,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? AppTheme.primaryPurple.withOpacity(0.1)
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        item.icon,
+                        size: 22,
+                        color: isSelected
+                            ? AppTheme.primaryPurple
+                            : AppTheme.textLight,
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        item.label,
+                        style: GoogleFonts.inter(
+                          fontSize: 10,
+                          fontWeight:
+                              isSelected ? FontWeight.w600 : FontWeight.w400,
+                          color: isSelected
+                              ? AppTheme.primaryPurple
+                              : AppTheme.textLight,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildScanButton(bool isSelected) {
+    return GestureDetector(
+      onTap: () => setState(() => _selectedIndex = 2),
+      child: Container(
+        width: 52,
+        height: 52,
+        margin: const EdgeInsets.only(bottom: 4),
+        decoration: BoxDecoration(
+          gradient: AppTheme.primaryGradient,
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: AppTheme.primaryPurple.withOpacity(0.4),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: const Icon(
+          Icons.document_scanner_rounded,
+          color: Colors.white,
+          size: 24,
+        ),
+      ),
+    );
+  }
+}
+
+class _NavItem {
+  final IconData icon;
+  final String label;
+  const _NavItem({required this.icon, required this.label});
+}
