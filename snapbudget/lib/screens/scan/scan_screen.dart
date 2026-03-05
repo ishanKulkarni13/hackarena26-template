@@ -224,18 +224,25 @@ class _ScanScreenState extends State<ScanScreen>
     );
   }
 
-  /// Opens the gallery via image_picker (unchanged flow from before).
+  /// Opens the gallery via image_picker.
+  /// On Android, image_picker handles READ_MEDIA_IMAGES permission natively;
+  /// on iOS we ask for photos permission explicitly.
   Future<void> _pickFromGallery() async {
     if (_isProcessing) return;
+    debugPrint('🖼️ [ScanScreen] Opening gallery...');
 
-    var status = await Permission.photos.status;
-    if (status.isDenied) status = await Permission.photos.request();
-
-    if (!status.isGranted && !status.isLimited) {
-      if (status.isPermanentlyDenied && mounted) {
-        await _showSettingsDialog('Photo Library');
+    // On iOS, Permission.photos must be granted first.
+    // On Android 13+, permission_handler's Permission.photos is undefined;
+    // image_picker handles READ_MEDIA_IMAGES internally, so we skip manual check.
+    if (Theme.of(context).platform == TargetPlatform.iOS) {
+      var status = await Permission.photos.status;
+      if (status.isDenied) status = await Permission.photos.request();
+      if (!status.isGranted && !status.isLimited) {
+        if (status.isPermanentlyDenied && mounted) {
+          await _showSettingsDialog('Photo Library');
+        }
+        return;
       }
-      return;
     }
 
     final XFile? imageFile = await _picker.pickImage(
@@ -243,12 +250,17 @@ class _ScanScreenState extends State<ScanScreen>
       imageQuality: 85,
       maxWidth: 2048,
     );
+    debugPrint('🖼️ [ScanScreen] Gallery image: ${imageFile?.path ?? "cancelled"}');
     if (imageFile == null || !mounted) return;
 
     setState(() => _isProcessing = true);
     final result = await _geminiService.analyseReceipt(imageFile);
     if (!mounted) return;
     setState(() => _isProcessing = false);
+
+    if (!result.parsedSuccessfully) {
+      debugPrint('⚠️ [ScanScreen] Gemini failed to parse gallery image — showing blank form');
+    }
 
     final user = context.read<AuthProvider>().user;
     final userId = user?.uid ?? '';

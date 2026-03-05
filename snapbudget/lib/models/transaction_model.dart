@@ -1,3 +1,5 @@
+import 'receipt_parse_result.dart';
+
 class Transaction {
   final String id;
   final String userId;
@@ -83,6 +85,65 @@ class Transaction {
       createdAt: map['createdAt'] != null
           ? DateTime.parse(map['createdAt'])
           : DateTime.now(),
+    );
+  }
+
+  /// Creates a copy of this Transaction with selective field overrides.
+  /// Used by ReceiptConfirmSheet to apply user edits before saving.
+  Transaction copyWith({
+    String? id,
+    String? userId,
+    String? title,
+    String? description,
+    double? amount,
+    TransactionType? type,
+    TransactionCategory? category,
+    DateTime? date,
+    String? merchant,
+    PaymentMethod? paymentMethod,
+    String? notes,
+    bool? isRecurring,
+    TransactionSource? source,
+    String? receiptImageURL,
+  }) {
+    return Transaction(
+      id: id ?? this.id,
+      userId: userId ?? this.userId,
+      title: title ?? this.title,
+      description: description ?? this.description,
+      amount: amount ?? this.amount,
+      type: type ?? this.type,
+      category: category ?? this.category,
+      date: date ?? this.date,
+      merchant: merchant ?? this.merchant,
+      paymentMethod: paymentMethod ?? this.paymentMethod,
+      notes: notes ?? this.notes,
+      isRecurring: isRecurring ?? this.isRecurring,
+      source: source ?? this.source,
+      receiptImageURL: receiptImageURL ?? this.receiptImageURL,
+    );
+  }
+
+  /// Maps a [ReceiptParseResult] from the Gemini service into a Transaction.
+  /// The [userId] comes from AuthProvider (Firebase UID).
+  /// The Gemini custom label is stored in [notes] when category == other.
+  factory Transaction.fromReceiptResult(
+    ReceiptParseResult result, {
+    required String userId,
+  }) {
+    return Transaction(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      userId: userId,
+      title: result.title.isNotEmpty ? result.title : 'Receipt',
+      description: result.merchantName,
+      amount: result.amount,
+      type: TransactionType.expense,
+      category: result.category,
+      date: result.date,
+      merchant: result.merchantName,
+      paymentMethod: PaymentMethod.cash, // User can change in confirm sheet
+      notes: result.customLabel, // Custom AI category label stored in notes
+      source: TransactionSource.receipt,
     );
   }
 }
