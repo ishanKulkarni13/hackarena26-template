@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../theme/app_theme.dart';
 import '../../models/split_bill_model.dart';
+import '../../services/notification_service.dart';
 
 class SplitSyncScreen extends StatefulWidget {
   const SplitSyncScreen({super.key});
@@ -354,19 +356,51 @@ class _SplitSyncScreenState extends State<SplitSyncScreen>
   }
 
   Widget _buildFriendsList() {
+    // owesYou: true = they owe you, false = you owe them
     final friends = [
-      {'name': 'Priya S.', 'amount': '₹3,125', 'owes': true},
-      {'name': 'Karan M.', 'amount': '₹3,125', 'owes': true},
-      {'name': 'Amit K.', 'amount': '₹0', 'owes': false},
-      {'name': 'Sneha R.', 'amount': '₹0', 'owes': false},
-      {'name': 'Raj P.', 'amount': '₹162', 'owes': true},
+      {
+        'name': 'Priya S.',
+        'amount': '₹3,125',
+        'billTitle': 'Goa Trip',
+        'owesYou': true
+      },
+      {
+        'name': 'Karan M.',
+        'amount': '₹3,125',
+        'billTitle': 'Goa Trip',
+        'owesYou': true
+      },
+      {
+        'name': 'Amit K.',
+        'amount': '₹0',
+        'billTitle': 'Dinner at Punjab Grill',
+        'owesYou': false
+      },
+      {
+        'name': 'Sneha R.',
+        'amount': '₹0',
+        'billTitle': 'Dinner at Punjab Grill',
+        'owesYou': false
+      },
+      {
+        'name': 'Raj P.',
+        'amount': '₹162',
+        'billTitle': 'Netflix Family Plan',
+        'owesYou': true
+      },
     ];
+
     return ListView.builder(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       itemCount: friends.length,
       itemBuilder: (context, i) {
         final f = friends[i];
-        final owes = f['owes'] as bool;
+        final owesYou = f['owesYou'] as bool;
+        final name = f['name'] as String;
+        final amount = f['amount'] as String;
+        final billTitle = f['billTitle'] as String;
+        final isSettled = amount == '₹0';
+
         return Container(
           margin: const EdgeInsets.only(bottom: 10),
           padding: const EdgeInsets.all(14),
@@ -379,9 +413,13 @@ class _SplitSyncScreenState extends State<SplitSyncScreen>
               width: 44,
               height: 44,
               decoration: BoxDecoration(
-                  gradient: AppTheme.primaryGradient, shape: BoxShape.circle),
+                  gradient: owesYou
+                      ? AppTheme.primaryGradient
+                      : const LinearGradient(
+                          colors: [Color(0xFFFF6B6B), Color(0xFFFF8E53)]),
+                  shape: BoxShape.circle),
               child: Center(
-                  child: Text((f['name'] as String)[0],
+                  child: Text(name[0],
                       style: GoogleFonts.inter(
                           fontSize: 18,
                           fontWeight: FontWeight.w700,
@@ -389,36 +427,92 @@ class _SplitSyncScreenState extends State<SplitSyncScreen>
             ),
             const SizedBox(width: 12),
             Expanded(
-                child: Text(f['name'] as String,
-                    style: GoogleFonts.inter(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: AppTheme.textDark))),
-            if (owes)
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(name,
+                      style: GoogleFonts.inter(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.textDark)),
+                  const SizedBox(height: 2),
+                  if (!isSettled)
+                    Text(
+                      owesYou ? 'Owes you $amount' : 'You owe $amount',
+                      style: GoogleFonts.inter(
+                          fontSize: 11,
+                          color: owesYou
+                              ? AppTheme.successGreen
+                              : AppTheme.errorRed,
+                          fontWeight: FontWeight.w500),
+                    )
+                  else
+                    Text('All settled',
+                        style: GoogleFonts.inter(
+                            fontSize: 11,
+                            color: AppTheme.textLight,
+                            fontWeight: FontWeight.w500)),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            if (isSettled)
+              Text('Settled ✅',
+                  style: GoogleFonts.inter(
+                      fontSize: 12,
+                      color: AppTheme.successGreen,
+                      fontWeight: FontWeight.w600))
+            else
               GestureDetector(
-                onTap: () {},
+                onTap: () => _showRemindDrawer(
+                  name: name,
+                  amount: amount,
+                  billTitle: billTitle,
+                  initialIndex: owesYou ? 1 : 0,
+                ),
                 child: Container(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
                   decoration: BoxDecoration(
-                      gradient: AppTheme.primaryGradient,
+                      gradient: owesYou ? AppTheme.primaryGradient : null,
+                      color:
+                          owesYou ? null : AppTheme.errorRed.withOpacity(0.1),
+                      border:
+                          owesYou ? null : Border.all(color: AppTheme.errorRed),
                       borderRadius: BorderRadius.circular(20)),
                   child: Text('Remind',
                       style: GoogleFonts.inter(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
-                          color: Colors.white)),
+                          color: owesYou ? Colors.white : AppTheme.errorRed)),
                 ),
-              )
-            else
-              Text('Settled ✅',
-                  style: GoogleFonts.inter(
-                      fontSize: 12,
-                      color: AppTheme.successGreen,
-                      fontWeight: FontWeight.w600)),
+              ),
           ]),
         );
       },
+    );
+  }
+
+  // ------------------------------------------------------------------
+  // Sheets & notification helpers
+  // ------------------------------------------------------------------
+
+  void _showRemindDrawer({
+    required String name,
+    required String amount,
+    required String billTitle,
+    required int initialIndex,
+  }) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => _RemindDrawerSheet(
+        name: name,
+        amount: amount,
+        billTitle: billTitle,
+        initialIndex: initialIndex,
+      ),
     );
   }
 
@@ -1153,6 +1247,295 @@ class _AddSplitBottomSheetState extends State<_AddSplitBottomSheet> {
           border: InputBorder.none,
           contentPadding:
               const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Reminder Drawer with Tabs
+// ---------------------------------------------------------------------------
+class _RemindDrawerSheet extends StatefulWidget {
+  final String name;
+  final String amount;
+  final String billTitle;
+  final int initialIndex;
+
+  const _RemindDrawerSheet({
+    required this.name,
+    required this.amount,
+    required this.billTitle,
+    this.initialIndex = 0,
+  });
+
+  @override
+  State<_RemindDrawerSheet> createState() => _RemindDrawerSheetState();
+}
+
+class _RemindDrawerSheetState extends State<_RemindDrawerSheet>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(
+      length: 2,
+      vsync: this,
+      initialIndex: widget.initialIndex,
+    );
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  void _scheduleReminder(int days) async {
+    final scheduledDate = DateTime.now().add(Duration(days: days));
+    await NotificationService().scheduleReminderSelf(
+      friendName: widget.name,
+      amount: widget.amount,
+      billTitle: widget.billTitle,
+      scheduledDate: scheduledDate,
+    );
+    if (mounted) {
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('🔔 Scheduled payment reminder for $days day(s).',
+              style:
+                  GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w500)),
+          backgroundColor: AppTheme.warningOrange,
+          behavior: SnackBarBehavior.floating,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      );
+    }
+  }
+
+  void _showCustomDatePicker() async {
+    final pickedDate = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now().add(const Duration(days: 1)),
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+    );
+    if (pickedDate != null && mounted) {
+      final TimeOfDay? pickedTime = await showTimePicker(
+        context: context,
+        initialTime: TimeOfDay.now(),
+      );
+      if (pickedTime != null && mounted) {
+        final DateTime scheduledDateTime = DateTime(
+          pickedDate.year,
+          pickedDate.month,
+          pickedDate.day,
+          pickedTime.hour,
+          pickedTime.minute,
+        );
+
+        if (scheduledDateTime.isAfter(DateTime.now())) {
+          await NotificationService().scheduleReminderSelf(
+            friendName: widget.name,
+            amount: widget.amount,
+            billTitle: widget.billTitle,
+            scheduledDate: scheduledDateTime,
+          );
+
+          if (mounted) {
+            Navigator.pop(context);
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('🔔 Custom payment reminder scheduled.',
+                    style: GoogleFonts.inter(
+                        fontSize: 13, fontWeight: FontWeight.w500)),
+                backgroundColor: AppTheme.warningOrange,
+                behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+              ),
+            );
+          }
+        }
+      }
+    }
+  }
+
+  void _sharePaymentRequest() {
+    final text =
+        "Hey ${widget.name}, just a friendly reminder about the ${widget.amount} for \"${widget.billTitle}\". Let me know when you can settle up! Thanks.";
+    Share.share(text);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: AppTheme.cardWhite,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(height: 12),
+          // Drag handle
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: AppTheme.divider,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 16),
+          TabBar(
+            controller: _tabController,
+            labelColor: AppTheme.primaryPurple,
+            unselectedLabelColor: AppTheme.textMedium,
+            indicatorColor: AppTheme.primaryPurple,
+            labelStyle:
+                GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600),
+            tabs: const [
+              Tab(text: "Remind Myself"),
+              Tab(text: "Remind My Friend"),
+            ],
+          ),
+          SizedBox(
+            height: 380, // Enough height for the content
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                _buildRemindMyselfTab(),
+                _buildRemindFriendTab(),
+              ],
+            ),
+          )
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRemindMyselfTab() {
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            "Schedule a notification reminder so you don't forget to pay ${widget.amount} to ${widget.name}.",
+            style: GoogleFonts.inter(fontSize: 14, color: AppTheme.textMedium),
+          ),
+          const SizedBox(height: 24),
+          _reminderOption(
+            title: "Remind in 1 day",
+            icon: Icons.timer_rounded,
+            onTap: () => _scheduleReminder(1),
+          ),
+          const SizedBox(height: 12),
+          _reminderOption(
+            title: "Remind in 2 days",
+            icon: Icons.access_time_filled_rounded,
+            onTap: () => _scheduleReminder(2),
+          ),
+          const SizedBox(height: 12),
+          _reminderOption(
+            title: "Custom Time...",
+            icon: Icons.calendar_month_rounded,
+            onTap: _showCustomDatePicker,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRemindFriendTab() {
+    final String msg =
+        "Hey ${widget.name}, just a friendly reminder about the ${widget.amount} for \"${widget.billTitle}\". Let me know when you can settle up! Thanks.";
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            "Send a message to ${widget.name} to remind them to pay.",
+            style: GoogleFonts.inter(
+                fontSize: 14,
+                color: AppTheme.textDark,
+                fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppTheme.background,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppTheme.divider),
+            ),
+            child: Text(
+              msg,
+              style: GoogleFonts.inter(
+                  fontSize: 13,
+                  color: AppTheme.textMedium,
+                  fontStyle: FontStyle.italic),
+            ),
+          ),
+          const Spacer(),
+          GestureDetector(
+            onTap: _sharePaymentRequest,
+            child: Container(
+              width: double.infinity,
+              height: 52,
+              decoration: BoxDecoration(
+                gradient: AppTheme.primaryGradient,
+                borderRadius: BorderRadius.circular(AppTheme.radiusXL),
+              ),
+              child: Center(
+                child: Text(
+                  "Share Message via...",
+                  style: GoogleFonts.inter(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+        ],
+      ),
+    );
+  }
+
+  Widget _reminderOption({
+    required String title,
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: AppTheme.background,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppTheme.divider),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: AppTheme.primaryPurple, size: 20),
+            const SizedBox(width: 12),
+            Text(title,
+                style: GoogleFonts.inter(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.textDark)),
+            const Spacer(),
+            const Icon(Icons.chevron_right_rounded, color: AppTheme.textLight),
+          ],
         ),
       ),
     );
