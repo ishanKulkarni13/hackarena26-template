@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:speech_to_text/speech_to_text.dart';
 
 import 'package:provider/provider.dart';
 import '../../models/transaction_model.dart';
@@ -42,9 +43,17 @@ class _ScanScreenState extends State<ScanScreen>
   bool _isCameraInitialized = false;
   bool _isCameraPermissionDenied = false;
   bool _isTorchOn = false;
-  bool _isProcessing = false; // Gemini is working
+  bool _isProcessing = false; // Gemini is working (receipt)
   bool _isCapturing = false; // shutter flash in progress
   bool _showShutterFlash = false;
+
+  // ─── Voice / STT state ────────────────────────────────────────────────────
+  final SpeechToText _stt = SpeechToText();
+  bool _sttReady = false;
+  bool _isListening = false;
+  bool _isVoiceProcessing = false; // Gemini working (voice)
+  bool _micPermissionDenied = false;
+  String _liveTranscript = '';
 
   // ─── Services ─────────────────────────────────────────────────────────────
   final _picker = ImagePicker();
@@ -71,7 +80,10 @@ class _ScanScreenState extends State<ScanScreen>
     WidgetsBinding.instance.addObserver(this);
 
     // Kick off camera init on the next frame so build() can run first
-    WidgetsBinding.instance.addPostFrameCallback((_) => _initCamera());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initCamera();
+      _initStt();
+    });
   }
 
   @override
@@ -79,6 +91,7 @@ class _ScanScreenState extends State<ScanScreen>
     WidgetsBinding.instance.removeObserver(this);
     _pulseController.dispose();
     _cameraController?.dispose();
+    _stt.stop();
     super.dispose();
   }
 
@@ -801,32 +814,307 @@ class _ScanScreenState extends State<ScanScreen>
   }
 
   // ──────────────────────────────────────────────────────────────────────────
+  // STT — initialise, start, stop, process
+  // ──────────────────────────────────────────────────────────────────────────
+
+  Future<void> _initStt() async {
+    debugPrint('🎤 [ScanScreen] Initialising SpeechToText...');
+    final available = await _stt.initialize(
+      onStatus: (status) {
+        debugPrint('🎤 [STT] status: $status');
+        // When STT auto-stops after silence, transition to processing
+        if (status == 'done' && _isListening) {
+          _stopListening();
+        }
+      },
+      onError: (e) {
+        debugPrint('❌ [STT] error: $e');
+        if (mounted) setState(() => _isListening = false);
+      },
+    );
+    if (mounted) {
+      setState(() {
+        _sttReady = available;
+        _micPermissionDenied = !available;
+      });
+      debugPrint('🎤 [STT] available: $available');
+    }
+  }
+
+  Future<void> _startListening() async {
+    if (!_sttReady || _isListening || _isVoiceProcessing) return;
+    setState(() {
+      _liveTranscript = '';
+      _isListening = true;
+    });
+    HapticFeedback.lightImpact();
+    await _stt.listen(
+      onResult: (result) {
+        if (mounted) {
+          setState(() => _liveTranscript = result.recognizedWords);
+        }
+      },
+      listenFor: const Duration(seconds: 30),
+      pauseFor: const Duration(seconds: 3),
+      partialResults: true,
+      localeId: 'en_IN',
+    );
+  }
+
+  Future<void> _stopListening() async {
+    if (!_isListening) return;
+    await _stt.stop();
+    setState(() => _isListening = false);
+    HapticFeedback.mediumImpact();
+    final captured = _liveTranscript.trim();
+    debugPrint('🎤 [ScanScreen] Stopped. Transcript: "$captured"');
+    if (captured.isNotEmpty) {
+      await _processVoiceTranscript(captured);
+    }
+  }
+
+  Future<void> _processVoiceTranscript(String transcript) async {
+    if (!mounted) return;
+    setState(() => _isVoiceProcessing = true);
+    debugPrint('🧠 [ScanScreen] Sending to Gemini: "$transcript"');
+
+    final result = await _geminiService.analyseVoiceText(transcript);
+
+    if (!mounted) return;
+    setState(() {
+      _isVoiceProcessing = false;
+      _liveTranscript = '';
+    });
+
+    if (!result.parsedSuccessfully) {
+      debugPrint('⚠️ [ScanScreen] Voice parse failed — showing blank form');
+    }
+
+    final user = context.read<AuthProvider>().user;
+    final userId = user?.uid ?? '';
+
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => ReceiptConfirmSheet(
+        result: result,
+        userId: userId,
+        onSave: (Transaction tx) {
+          // ── Firebase integration point ──
+          context.read<TransactionProvider>().addTransaction(tx);
+          debugPrint('✅ Voice tx saved: ${tx.title} | ₹${tx.amount}');
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                '${tx.title} — ₹${tx.amount.toStringAsFixed(0)} added!',
+                style: GoogleFonts.inter(color: Colors.white),
+              ),
+              backgroundColor: AppTheme.successGreen,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+              margin: const EdgeInsets.all(16),
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
   // Voice view
   // ──────────────────────────────────────────────────────────────────────────
 
   Widget _buildVoiceView() {
+    // ── State 1: mic permission denied ──────────────────────────────────────
+    if (_micPermissionDenied) {
+      return Column(
+        key: const ValueKey('voice_denied'),
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.mic_off_rounded, size: 64, color: Colors.white30),
+          const SizedBox(height: 20),
+          Text('Microphone access denied',
+              style: GoogleFonts.inter(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white54)),
+          const SizedBox(height: 12),
+          GestureDetector(
+            onTap: openAppSettings,
+            child: Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              decoration: BoxDecoration(
+                gradient: AppTheme.primaryGradient,
+                borderRadius: BorderRadius.circular(AppTheme.radiusXL),
+              ),
+              child: Text('Open Settings',
+                  style: GoogleFonts.inter(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white)),
+            ),
+          ),
+        ],
+      );
+    }
+
+    // ── State 2: Gemini is processing the transcript ─────────────────────────
+    if (_isVoiceProcessing) {
+      return Column(
+        key: const ValueKey('voice_processing'),
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 80,
+            height: 80,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.08),
+              shape: BoxShape.circle,
+            ),
+            child: const Padding(
+              padding: EdgeInsets.all(20),
+              child: CircularProgressIndicator(
+                  color: AppTheme.accentBlue, strokeWidth: 3),
+            ),
+          ),
+          const SizedBox(height: 24),
+          Text('AI is thinking…',
+              style: GoogleFonts.inter(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white)),
+          const SizedBox(height: 8),
+          Text('Parsing your transaction',
+              style: GoogleFonts.inter(fontSize: 13, color: Colors.white54)),
+        ],
+      );
+    }
+
+    // ── State 3: Currently listening ────────────────────────────────────────
+    if (_isListening) {
+      return Column(
+        key: const ValueKey('voice_listening'),
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          AnimatedBuilder(
+            animation: _pulseController,
+            builder: (context, child) {
+              final scale = 1.0 + (_pulseController.value * 0.18);
+              return Transform.scale(
+                scale: scale,
+                child: Container(
+                  width: 120,
+                  height: 120,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: AppTheme.errorRed.withValues(alpha: 0.15),
+                    border: Border.all(
+                        color: AppTheme.errorRed.withValues(alpha: 0.6),
+                        width: 2),
+                  ),
+                  child: GestureDetector(
+                    onTap: _stopListening,
+                    child: Container(
+                      margin: const EdgeInsets.all(16),
+                      decoration: const BoxDecoration(
+                        color: AppTheme.errorRed,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.stop_rounded,
+                          color: Colors.white, size: 40),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 28),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 8,
+                height: 8,
+                decoration: const BoxDecoration(
+                  color: AppTheme.errorRed,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text('Listening…',
+                  style: GoogleFonts.inter(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white)),
+            ],
+          ),
+          const SizedBox(height: 16),
+          // Live transcript display
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 200),
+            child: _liveTranscript.isEmpty
+                ? Text(
+                    'Say your transaction aloud…',
+                    key: const ValueKey('placeholder'),
+                    style:
+                        GoogleFonts.inter(fontSize: 13, color: Colors.white38),
+                    textAlign: TextAlign.center,
+                  )
+                : Container(
+                    key: ValueKey(_liveTranscript.length),
+                    margin: const EdgeInsets.symmetric(horizontal: 28),
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.07),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Text(
+                      _liveTranscript,
+                      style: GoogleFonts.inter(
+                          fontSize: 14, color: Colors.white, height: 1.5),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+          ),
+          const SizedBox(height: 24),
+          Text('Tap the button to stop',
+              style: GoogleFonts.inter(fontSize: 12, color: Colors.white38)),
+        ],
+      );
+    }
+
+    // ── State 4: Idle (default) ──────────────────────────────────────────────
     return Column(
-      key: const ValueKey('voice'),
+      key: const ValueKey('voice_idle'),
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        ScaleTransition(
-          scale: _pulseAnim,
-          child: Container(
-            width: 150,
-            height: 150,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: RadialGradient(colors: [
-                AppTheme.primaryPurple.withValues(alpha: 0.4),
-                Colors.transparent,
-              ]),
-            ),
+        GestureDetector(
+          onTap: _sttReady ? _startListening : null,
+          child: ScaleTransition(
+            scale: _pulseAnim,
             child: Container(
-              margin: const EdgeInsets.all(20),
+              width: 150,
+              height: 150,
               decoration: BoxDecoration(
-                  gradient: AppTheme.primaryGradient, shape: BoxShape.circle),
-              child:
-                  const Icon(Icons.mic_rounded, color: Colors.white, size: 50),
+                shape: BoxShape.circle,
+                gradient: RadialGradient(colors: [
+                  AppTheme.primaryPurple.withValues(alpha: 0.4),
+                  Colors.transparent,
+                ]),
+              ),
+              child: Container(
+                margin: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                    gradient: AppTheme.primaryGradient,
+                    shape: BoxShape.circle,
+                    boxShadow: AppTheme.buttonShadow),
+                child:
+                    const Icon(Icons.mic_rounded, color: Colors.white, size: 50),
+              ),
             ),
           ),
         ),
@@ -837,14 +1125,16 @@ class _ScanScreenState extends State<ScanScreen>
                 fontWeight: FontWeight.w700,
                 color: Colors.white)),
         const SizedBox(height: 8),
-        Text('Say something like:\n"I spent ₹500 on food at Swiggy"',
-            textAlign: TextAlign.center,
-            style: GoogleFonts.inter(
-                fontSize: 14, color: Colors.white54, height: 1.6)),
-        const SizedBox(height: 40),
+        Text(
+          '"I spent ₹500 on food at Swiggy"\n"Paid 200 for auto ride"',
+          textAlign: TextAlign.center,
+          style: GoogleFonts.inter(
+              fontSize: 13, color: Colors.white54, height: 1.7),
+        ),
+        const SizedBox(height: 36),
         Container(
           padding: const EdgeInsets.all(16),
-          margin: const EdgeInsets.symmetric(horizontal: 20),
+          margin: const EdgeInsets.symmetric(horizontal: 28),
           decoration: BoxDecoration(
               color: Colors.white.withValues(alpha: 0.05),
               borderRadius: BorderRadius.circular(16)),
@@ -852,13 +1142,17 @@ class _ScanScreenState extends State<ScanScreen>
             const Icon(Icons.auto_awesome_rounded,
                 color: AppTheme.accentBlue, size: 18),
             const SizedBox(width: 10),
-            Text('AI will auto-categorize your expense',
-                style: GoogleFonts.inter(fontSize: 13, color: Colors.white70)),
+            Expanded(
+              child: Text('AI auto-categorises and pre-fills all details',
+                  style:
+                      GoogleFonts.inter(fontSize: 13, color: Colors.white70)),
+            ),
           ]),
         ),
       ],
     );
   }
+
 
   // ──────────────────────────────────────────────────────────────────────────
   // Helpers

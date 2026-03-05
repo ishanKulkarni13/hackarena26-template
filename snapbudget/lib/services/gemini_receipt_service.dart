@@ -194,6 +194,119 @@ Respond with JSON only:
     }
   }
 
+  /// Sends a [transcribedText] string from speech recognition to Gemini
+  /// and returns a [ReceiptParseResult], identical contract to [analyseReceipt].
+  ///
+  /// The caller does NOT need to care how the text was captured — the
+  /// VoiceView captures it via speech_to_text, then just calls this.
+  Future<ReceiptParseResult> analyseVoiceText(String transcribedText) async {
+    debugPrint('🎤 [GeminiReceiptService] analyseVoiceText() called');
+    debugPrint('   Transcribed: "$transcribedText"');
+
+    if (transcribedText.trim().isEmpty) {
+      debugPrint('❌ [GeminiReceiptService] Empty transcription — returning failed');
+      return ReceiptParseResult.failed();
+    }
+
+    try {
+      // ── Step 1: API key ─────────────────────────────────────────────────
+      final apiKey = dotenv.env['GEMINI_API_KEY'] ?? '';
+      if (apiKey.isEmpty) {
+        debugPrint('❌ [GeminiReceiptService] GEMINI_API_KEY is missing from .env');
+        return ReceiptParseResult.failed();
+      }
+      debugPrint('✅ [GeminiReceiptService] API key loaded (${apiKey.substring(0, 8)}...)');
+
+      // ── Step 2: Build prompt ────────────────────────────────────────────
+      final model = GenerativeModel(model: _model, apiKey: apiKey);
+      final today = DateTime.now().toIso8601String().substring(0, 10);
+
+      final prompt = '''
+You are a personal finance assistant. The user has spoken a voice note describing a transaction.
+Extract the transaction details from the text below and return ONLY valid JSON — no markdown, no code fences, no explanation.
+
+Voice note: "$transcribedText"
+
+Fields to extract:
+- merchant_name: string — the store, restaurant, or service name (empty string if not mentioned)
+- total_amount: number — the amount spent (0 if not mentioned)
+- date: string — format YYYY-MM-DD; use today ($today) if not mentioned
+- title: string — short human-friendly label like "Lunch", "Uber Ride", "Groceries"
+- category: string — MUST be exactly one of: ${_categoryNames.join(', ')}
+  If none match well, use "other" and set custom_category.
+- custom_category: string or null — short label if category is "other"
+
+Respond with JSON only:
+{
+  "merchant_name": "",
+  "total_amount": 0,
+  "date": "",
+  "title": "",
+  "category": "",
+  "custom_category": null
+}
+''';
+
+      debugPrint('📡 [GeminiReceiptService] Sending voice text to Gemini...');
+      final response = await model.generateContent([
+        Content.text(prompt),
+      ]);
+
+      // ── Step 3: Parse response ──────────────────────────────────────────
+      final rawText = response.text ?? '';
+      debugPrint('📥 [GeminiReceiptService] Raw voice response:\n$rawText');
+
+      if (rawText.isEmpty) {
+        debugPrint('❌ [GeminiReceiptService] Empty response from Gemini');
+        return ReceiptParseResult.failed();
+      }
+
+      final jsonStr = _extractJson(rawText);
+      debugPrint('🔍 [GeminiReceiptService] Extracted JSON:\n$jsonStr');
+
+      final Map<String, dynamic> data = jsonDecode(jsonStr);
+      debugPrint('✅ [GeminiReceiptService] JSON decoded: $data');
+
+      final categoryStr = (data['category'] as String? ?? 'other');
+      final category = _parseCategory(categoryStr);
+
+      String? customLabel;
+      if (category == TransactionCategory.other) {
+        customLabel = data['custom_category'] as String?;
+      }
+
+      final amountRaw = data['total_amount'];
+      final double amount = amountRaw is num
+          ? amountRaw.toDouble()
+          : double.tryParse(amountRaw.toString()) ?? 0.0;
+
+      DateTime date;
+      try {
+        date = DateTime.parse(data['date'] as String? ?? '');
+      } catch (_) {
+        date = DateTime.now();
+      }
+
+      debugPrint(
+        '✅ [GeminiReceiptService] Voice parse complete: "${data['title']}" | ₹$amount | ${category.name}',
+      );
+
+      return ReceiptParseResult(
+        merchantName: (data['merchant_name'] as String? ?? '').trim(),
+        title: (data['title'] as String? ?? '').trim(),
+        amount: amount,
+        date: date,
+        category: category,
+        customLabel: customLabel,
+        parsedSuccessfully: true,
+      );
+    } catch (e, stack) {
+      debugPrint('❌ [GeminiReceiptService] EXCEPTION in analyseVoiceText: $e');
+      debugPrint('   Stack trace:\n$stack');
+      return ReceiptParseResult.failed();
+    }
+  }
+
   /// Strips markdown code fences from Gemini output.
   /// Finds the first '{' and last '}' to isolate valid JSON.
   String _extractJson(String raw) {
