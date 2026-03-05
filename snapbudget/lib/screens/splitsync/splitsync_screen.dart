@@ -152,9 +152,12 @@ class _SplitSyncScreenState extends State<SplitSyncScreen>
                 child: TabBar(
                   controller: _tabController,
                   dividerColor: Colors.transparent,
+                  indicatorSize: TabBarIndicatorSize.tab,
+                  padding: const EdgeInsets.all(4),
+                  splashBorderRadius: BorderRadius.circular(10),
                   indicator: BoxDecoration(
                     gradient: AppTheme.primaryGradient,
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(10),
                   ),
                   labelColor: Colors.white,
                   unselectedLabelColor: AppTheme.textMedium,
