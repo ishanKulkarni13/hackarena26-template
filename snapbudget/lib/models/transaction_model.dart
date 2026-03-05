@@ -1,3 +1,5 @@
+import 'receipt_parse_result.dart';
+
 class Transaction {
   final String id;
   final String title;
@@ -10,6 +12,10 @@ class Transaction {
   final PaymentMethod paymentMethod;
   final String? notes;
   final bool isRecurring;
+  // Holds a free-text category label when Gemini returns a category not in
+  // the enum (e.g. "Ice Cream", "Pet Care"). Display this instead of
+  // category.label whenever it is non-null.
+  final String? customLabel;
 
   Transaction({
     required this.id,
@@ -23,7 +29,58 @@ class Transaction {
     required this.paymentMethod,
     this.notes,
     this.isRecurring = false,
+    this.customLabel,
   });
+
+  /// Creates a copy of this Transaction with selective field overrides.
+  Transaction copyWith({
+    String? id,
+    String? title,
+    String? description,
+    double? amount,
+    TransactionType? type,
+    TransactionCategory? category,
+    DateTime? date,
+    String? merchant,
+    PaymentMethod? paymentMethod,
+    String? notes,
+    bool? isRecurring,
+    String? customLabel,
+  }) {
+    return Transaction(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      description: description ?? this.description,
+      amount: amount ?? this.amount,
+      type: type ?? this.type,
+      category: category ?? this.category,
+      date: date ?? this.date,
+      merchant: merchant ?? this.merchant,
+      paymentMethod: paymentMethod ?? this.paymentMethod,
+      notes: notes ?? this.notes,
+      isRecurring: isRecurring ?? this.isRecurring,
+      customLabel: customLabel ?? this.customLabel,
+    );
+  }
+
+  /// Maps a [ReceiptParseResult] from the Gemini service into a Transaction.
+  /// This is the primary integration point between the AI layer and the model.
+  /// TODO: When Firebase is integrated, this is where you'd also set a Firestore
+  /// document ID or sync status.
+  factory Transaction.fromReceiptResult(ReceiptParseResult result) {
+    return Transaction(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      title: result.title,
+      description: result.merchantName,
+      amount: result.amount,
+      type: TransactionType.expense,
+      category: result.category,
+      date: result.date,
+      merchant: result.merchantName,
+      paymentMethod: PaymentMethod.cash, // Default; user can change in confirm sheet
+      customLabel: result.customLabel,
+    );
+  }
 }
 
 enum TransactionType { expense, income, transfer }
