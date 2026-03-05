@@ -5,17 +5,18 @@
 
 ## Team Details
 
-- **Team Name:**
-- **Members:**
-- **Domain:**
+- **Team Name:*AVAIA*
+- **Members:*Ishan Kulkarni, Satyjit Gaikwad, Gungun Borkar, Payal Chopade*
+- **Domain:*FINTECH*
 
 ---
 
 ## Project
 
-**Problem:** 
+**Problem:*SnapBudget OCR* 
 
-**Solution:** 
+**Solution:*SnapBudget is an AI-powered expense tracking solution that removes manual entry by automatically logging expenses from receipts, SMS alerts, voice inputs, and digital payments. Using on-device intelligence for privacy-first processing, it categorizes spending in real time, sends smart budget alerts, and generates clear financial insights. The app also enables seamless social features like bill splitting, shared wallets, and group budgets, making money management effortless, accurate, and stress-free for individuals and groups.
+* 
 
 ---
 
