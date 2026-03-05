@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:speech_to_text/speech_to_text.dart';
 
 import 'package:provider/provider.dart';
 import '../../models/transaction_model.dart';
@@ -50,6 +51,13 @@ class _ScanScreenState extends State<ScanScreen>
   final _picker = ImagePicker();
   final _geminiService = GeminiReceiptService();
 
+  // ─── Voice / Speech-to-Text state ─────────────────────────────────────────
+  final SpeechToText _speech = SpeechToText();
+  bool _speechAvailable = false;
+  bool _isListening = false;
+  bool _isParsingVoice = false;
+  String _voiceText = '';
+
   // ──────────────────────────────────────────────────────────────────────────
   // Lifecycle
   // ──────────────────────────────────────────────────────────────────────────
@@ -71,7 +79,10 @@ class _ScanScreenState extends State<ScanScreen>
     WidgetsBinding.instance.addObserver(this);
 
     // Kick off camera init on the next frame so build() can run first
-    WidgetsBinding.instance.addPostFrameCallback((_) => _initCamera());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initCamera();
+      _initSpeech();
+    });
   }
 
   @override
@@ -79,6 +90,7 @@ class _ScanScreenState extends State<ScanScreen>
     WidgetsBinding.instance.removeObserver(this);
     _pulseController.dispose();
     _cameraController?.dispose();
+    _speech.cancel();
     super.dispose();
   }
 
@@ -339,6 +351,98 @@ class _ScanScreenState extends State<ScanScreen>
                     fontWeight: FontWeight.w600)),
           ),
         ],
+      ),
+    );
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // Voice / Speech-to-Text
+  // ──────────────────────────────────────────────────────────────────────────
+
+  Future<void> _initSpeech() async {
+    _speechAvailable = await _speech.initialize(
+      onError: (error) =>
+          debugPrint('🎤 [ScanScreen] Speech error: ${error.errorMsg}'),
+      onStatus: (status) {
+        debugPrint('🎤 [ScanScreen] Speech status: $status');
+        if ((status == 'done' || status == 'notListening') &&
+            mounted &&
+            _isListening) {
+          setState(() => _isListening = false);
+        }
+      },
+    );
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _toggleListening() async {
+    if (_isListening) {
+      await _speech.stop();
+      setState(() => _isListening = false);
+      return;
+    }
+
+    // Request mic permission
+    var micStatus = await Permission.microphone.status;
+    if (micStatus.isDenied) micStatus = await Permission.microphone.request();
+    if (!micStatus.isGranted) {
+      if (micStatus.isPermanentlyDenied && mounted) {
+        await _showSettingsDialog('Microphone');
+      }
+      return;
+    }
+
+    setState(() {
+      _voiceText = '';
+      _isListening = true;
+    });
+
+    await _speech.listen(
+      onResult: (result) {
+        if (!mounted) return;
+        setState(() => _voiceText = result.recognizedWords);
+      },
+      listenFor: const Duration(seconds: 60),
+      pauseFor: const Duration(seconds: 4),
+      cancelOnError: true,
+      partialResults: true,
+    );
+  }
+
+  Future<void> _parseVoiceInput() async {
+    if (_voiceText.trim().isEmpty) return;
+    setState(() => _isParsingVoice = true);
+    final result = await _geminiService.parseVoiceText(_voiceText);
+    if (!mounted) return;
+    setState(() => _isParsingVoice = false);
+
+    final user = context.read<AuthProvider>().user;
+    final userId = user?.uid ?? '';
+
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => ReceiptConfirmSheet(
+        result: result,
+        userId: userId,
+        onSave: (Transaction tx) {
+          context.read<TransactionProvider>().addTransaction(tx);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                '${tx.title} — ₹${tx.amount.toStringAsFixed(0)} added!',
+                style: GoogleFonts.inter(color: Colors.white),
+              ),
+              backgroundColor: AppTheme.successGreen,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+              margin: const EdgeInsets.all(16),
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        },
       ),
     );
   }
@@ -805,57 +909,161 @@ class _ScanScreenState extends State<ScanScreen>
   // ──────────────────────────────────────────────────────────────────────────
 
   Widget _buildVoiceView() {
+    final statusText = _isParsingVoice
+        ? 'Analysing…'
+        : _isListening
+            ? 'Listening…'
+            : _voiceText.isNotEmpty
+                ? 'Tap mic to try again'
+                : _speechAvailable
+                    ? 'Tap to speak'
+                    : 'Mic unavailable';
+
     return Column(
       key: const ValueKey('voice'),
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        ScaleTransition(
-          scale: _pulseAnim,
-          child: Container(
-            width: 150,
-            height: 150,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: RadialGradient(colors: [
-                AppTheme.primaryPurple.withValues(alpha: 0.4),
-                Colors.transparent,
-              ]),
-            ),
-            child: Container(
-              margin: const EdgeInsets.all(20),
+        // ── Mic orb ──────────────────────────────────────────────────────────
+        GestureDetector(
+          onTap: (_isParsingVoice || !_speechAvailable) ? null : _toggleListening,
+          child: ScaleTransition(
+            scale: _pulseAnim,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              width: 150,
+              height: 150,
               decoration: BoxDecoration(
-                  gradient: AppTheme.primaryGradient, shape: BoxShape.circle),
-              child:
-                  const Icon(Icons.mic_rounded, color: Colors.white, size: 50),
+                shape: BoxShape.circle,
+                gradient: RadialGradient(colors: [
+                  (_isListening ? AppTheme.accentBlue : AppTheme.primaryPurple)
+                      .withValues(alpha: _isListening ? 0.55 : 0.4),
+                  Colors.transparent,
+                ]),
+              ),
+              child: Container(
+                margin: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  gradient: _isListening
+                      ? const LinearGradient(
+                          colors: [AppTheme.accentBlue, AppTheme.primaryPurple])
+                      : AppTheme.primaryGradient,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  _isListening ? Icons.stop_rounded : Icons.mic_rounded,
+                  color: Colors.white,
+                  size: 50,
+                ),
+              ),
             ),
           ),
         ),
+
         const SizedBox(height: 32),
-        Text('Tap to speak',
+
+        // ── Status label ─────────────────────────────────────────────────────
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 200),
+          child: Text(
+            statusText,
+            key: ValueKey(statusText),
             style: GoogleFonts.inter(
-                fontSize: 22,
-                fontWeight: FontWeight.w700,
-                color: Colors.white)),
-        const SizedBox(height: 8),
-        Text('Say something like:\n"I spent ₹500 on food at Swiggy"',
-            textAlign: TextAlign.center,
-            style: GoogleFonts.inter(
-                fontSize: 14, color: Colors.white54, height: 1.6)),
-        const SizedBox(height: 40),
-        Container(
-          padding: const EdgeInsets.all(16),
-          margin: const EdgeInsets.symmetric(horizontal: 20),
-          decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.05),
-              borderRadius: BorderRadius.circular(16)),
-          child: Row(children: [
-            const Icon(Icons.auto_awesome_rounded,
-                color: AppTheme.accentBlue, size: 18),
-            const SizedBox(width: 10),
-            Text('AI will auto-categorize your expense',
-                style: GoogleFonts.inter(fontSize: 13, color: Colors.white70)),
-          ]),
+              fontSize: 22,
+              fontWeight: FontWeight.w700,
+              color: _isListening ? AppTheme.accentBlue : Colors.white,
+            ),
+          ),
         ),
+        const SizedBox(height: 12),
+
+        // ── Hint text (idle & empty) ──────────────────────────────────────────
+        if (!_isListening && _voiceText.isEmpty && !_isParsingVoice)
+          Text(
+            'Say something like:\n"I spent ₹500 on food at Swiggy"',
+            textAlign: TextAlign.center,
+            style:
+                GoogleFonts.inter(fontSize: 14, color: Colors.white54, height: 1.6),
+          ),
+
+        // ── Transcribed text ─────────────────────────────────────────────────
+        if (_voiceText.isNotEmpty) ...[          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 24),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.07),
+              borderRadius: BorderRadius.circular(16),
+              border:
+                  Border.all(color: Colors.white.withValues(alpha: 0.13)),
+            ),
+            child: Text(
+              '"$_voiceText"',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(
+                  fontSize: 14, color: Colors.white, height: 1.5),
+            ),
+          ),
+          const SizedBox(height: 20),
+          // Add Transaction button
+          if (!_isListening && !_isParsingVoice)
+            GestureDetector(
+              onTap: _parseVoiceInput,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 32, vertical: 14),
+                decoration: BoxDecoration(
+                  gradient: AppTheme.primaryGradient,
+                  borderRadius: BorderRadius.circular(30),
+                  boxShadow: AppTheme.buttonShadow,
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.auto_awesome_rounded,
+                        color: Colors.white, size: 18),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Add Transaction',
+                      style: GoogleFonts.inter(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          // Parsing spinner
+          if (_isParsingVoice)
+            const SizedBox(
+              width: 28,
+              height: 28,
+              child: CircularProgressIndicator(
+                  color: AppTheme.accentBlue, strokeWidth: 2.5),
+            ),
+        ],
+
+        // ── AI info chip (idle & empty) ───────────────────────────────────────
+        if (_voiceText.isEmpty && !_isListening && !_isParsingVoice) ...[          const SizedBox(height: 32),
+          Container(
+            padding: const EdgeInsets.all(16),
+            margin: const EdgeInsets.symmetric(horizontal: 20),
+            decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(16)),
+            child: Row(children: [
+              const Icon(Icons.auto_awesome_rounded,
+                  color: AppTheme.accentBlue, size: 18),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text('AI will auto-categorize your expense',
+                    style: GoogleFonts.inter(
+                        fontSize: 13, color: Colors.white70)),
+              ),
+            ]),
+          ),
+        ],
       ],
     );
   }
