@@ -113,7 +113,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: Center(child: CircularProgressIndicator()));
                 }
 
-                final transactions = provider.transactions.take(5).toList();
+                final transactions =
+                    provider.recentlyAddedTransactions.take(5).toList();
 
                 if (transactions.isEmpty) {
                   return SliverToBoxAdapter(
