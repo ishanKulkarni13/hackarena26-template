@@ -6,6 +6,7 @@ class SplitBill {
   final DateTime date;
   final String? description;
   final SplitStatus status;
+  final Map<String, double>? expenseBreakdown; // e.g., {'Hotel': 5000, 'Food': 4500, 'Activities': 3000}
 
   SplitBill({
     required this.id,
@@ -15,6 +16,7 @@ class SplitBill {
     required this.date,
     this.description,
     required this.status,
+    this.expenseBreakdown,
   });
 
   double get amountPerPerson => totalAmount / members.length;

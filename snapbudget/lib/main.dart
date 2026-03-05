@@ -26,7 +26,9 @@ class SnapBudgetApp extends StatelessWidget {
     return MaterialApp(
       title: 'SnapBudget',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.theme,
+      theme: AppTheme.theme.copyWith(
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+      ),
       home: const WelcomeScreen(),
     );
   }

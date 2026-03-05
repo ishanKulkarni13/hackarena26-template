@@ -23,6 +23,11 @@ class _SplitSyncScreenState extends State<SplitSyncScreen>
       date: DateTime.now().subtract(const Duration(days: 3)),
       description: 'Hotel + Food + Activities',
       status: SplitStatus.partial,
+      expenseBreakdown: {
+        'Hotel': 6000,
+        'Food': 4000,
+        'Activities': 2500,
+      },
       members: [
         SplitMember(id: 'a', name: 'You', share: 3125, hasPaid: true),
         SplitMember(id: 'b', name: 'Priya', share: 3125, hasPaid: true),
@@ -178,7 +183,7 @@ class _SplitSyncScreenState extends State<SplitSyncScreen>
                   ListView.builder(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     itemCount: _bills.length,
-                    itemBuilder: (context, i) => _billCard(_bills[i]),
+                    itemBuilder: (context, i) => _billCard(_bills[i], i),
                   ),
                   _buildFriendsList(),
                 ],
@@ -210,7 +215,7 @@ class _SplitSyncScreenState extends State<SplitSyncScreen>
     );
   }
 
-  Widget _billCard(SplitBill bill) {
+  Widget _billCard(SplitBill bill, int index) {
     final settled = bill.members.where((m) => m.hasPaid).length;
     final total = bill.members.length;
     final progress = settled / total;
@@ -232,92 +237,119 @@ class _SplitSyncScreenState extends State<SplitSyncScreen>
         break;
     }
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppTheme.cardWhite,
-        borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
-        boxShadow: AppTheme.cardShadow,
-      ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          Text(bill.title,
-              style: GoogleFonts.inter(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: AppTheme.textDark)),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-                color: statusColor.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8)),
-            child: Text(statusLabel,
-                style: GoogleFonts.inter(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: statusColor)),
-          ),
-        ]),
-        if (bill.description != null) ...[
-          const SizedBox(height: 4),
-          Text(bill.description!,
-              style:
-                  GoogleFonts.inter(fontSize: 12, color: AppTheme.textLight)),
-        ],
-        const SizedBox(height: 12),
-        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          Text('Total: ${_fmt.format(bill.totalAmount)}',
-              style: GoogleFonts.inter(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: AppTheme.textDark)),
-          Text('Per person: ${_fmt.format(bill.amountPerPerson)}',
-              style:
-                  GoogleFonts.inter(fontSize: 12, color: AppTheme.textMedium)),
-        ]),
-        const SizedBox(height: 10),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(4),
-          child: LinearProgressIndicator(
-            value: progress,
-            minHeight: 6,
-            backgroundColor: AppTheme.divider,
-            valueColor: AlwaysStoppedAnimation<Color>(statusColor),
-          ),
+    return GestureDetector(
+      onTap: () => _showBillDetails(bill),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 14),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppTheme.cardWhite,
+          borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
+          boxShadow: AppTheme.cardShadow,
         ),
-        const SizedBox(height: 8),
-        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          Text('$settled/$total paid',
-              style:
-                  GoogleFonts.inter(fontSize: 11, color: AppTheme.textLight)),
-          Row(
-              children: bill.members
-                  .take(4)
-                  .map((m) => Container(
-                        width: 26,
-                        height: 26,
-                        margin: const EdgeInsets.only(left: 4),
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: m.hasPaid
-                              ? AppTheme.successGreen
-                              : AppTheme.divider,
-                          border: Border.all(
-                              color: AppTheme.background, width: 1.5),
-                        ),
-                        child: Center(
-                            child: Text(m.name[0],
-                                style: GoogleFonts.inter(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w700,
-                                    color: m.hasPaid
-                                        ? Colors.white
-                                        : AppTheme.textLight))),
-                      ))
-                  .toList()),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+            Expanded(
+              child: Text(bill.title,
+                  style: GoogleFonts.inter(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.textDark)),
+            ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                GestureDetector(
+                  onTap: () => _showEditSplitDialog(bill, index),
+                  child: const Icon(Icons.edit_rounded,
+                      size: 18, color: AppTheme.textMedium),
+                ),
+                const SizedBox(width: 8),
+                GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _bills.removeAt(index);
+                    });
+                  },
+                  child: const Icon(Icons.delete_rounded,
+                      size: 18, color: AppTheme.errorRed),
+                ),
+                const SizedBox(width: 12),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                      color: statusColor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8)),
+                  child: Text(statusLabel,
+                      style: GoogleFonts.inter(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: statusColor)),
+                ),
+              ],
+            ),
+          ]),
+          if (bill.description != null) ...[
+            const SizedBox(height: 4),
+            Text(bill.description!,
+                style:
+                    GoogleFonts.inter(fontSize: 12, color: AppTheme.textLight)),
+          ],
+          const SizedBox(height: 12),
+          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+            Text('Total: ${_fmt.format(bill.totalAmount)}',
+                style: GoogleFonts.inter(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.textDark)),
+            Text('Per person: ${_fmt.format(bill.amountPerPerson)}',
+                style: GoogleFonts.inter(
+                    fontSize: 12, color: AppTheme.textMedium)),
+          ]),
+          const SizedBox(height: 10),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: progress,
+              minHeight: 6,
+              backgroundColor: AppTheme.divider,
+              valueColor: AlwaysStoppedAnimation<Color>(statusColor),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+            Text('$settled/$total paid',
+                style:
+                    GoogleFonts.inter(fontSize: 11, color: AppTheme.textLight)),
+            Row(
+                children: bill.members
+                    .take(4)
+                    .map((m) => Container(
+                          width: 26,
+                          height: 26,
+                          margin: const EdgeInsets.only(left: 4),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: m.hasPaid
+                                ? AppTheme.successGreen
+                                : AppTheme.divider,
+                            border: Border.all(
+                                color: AppTheme.background, width: 1.5),
+                          ),
+                          child: Center(
+                              child: Text(m.name[0],
+                                  style: GoogleFonts.inter(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w700,
+                                      color: m.hasPaid
+                                          ? Colors.white
+                                          : AppTheme.textLight))),
+                        ))
+                    .toList()),
+          ]),
         ]),
-      ]),
+      ),
     );
   }
 
@@ -416,25 +448,466 @@ class _SplitSyncScreenState extends State<SplitSyncScreen>
       ),
     );
   }
+
+  void _showEditSplitDialog(SplitBill bill, int index) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => _AddSplitBottomSheet(
+        initialBill: bill,
+        onAdd: (title, amount, members) {
+          setState(() {
+            _bills[index] = SplitBill(
+              id: bill.id,
+              title: title,
+              totalAmount: amount,
+              members: members,
+              date: bill.date,
+              description: bill.description,
+              expenseBreakdown: bill.expenseBreakdown,
+              status: members.every((m) => m.hasPaid)
+                  ? SplitStatus.settled
+                  : SplitStatus.pending,
+            );
+          });
+        },
+      ),
+    );
+  }
+
+  void _showBillDetails(SplitBill bill) {
+    final billIndex = _bills.indexWhere((b) => b.id == bill.id);
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(24),
+        decoration: const BoxDecoration(
+            color: AppTheme.cardWhite,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header with title and status
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(bill.title,
+                            style: GoogleFonts.inter(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w800,
+                                color: AppTheme.textDark)),
+                        const SizedBox(height: 4),
+                        if (bill.description != null)
+                          Text(bill.description!,
+                              style: GoogleFonts.inter(
+                                  fontSize: 13, color: AppTheme.textMedium)),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  // Status badge
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: _getStatusColor(bill.status).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                          color: _getStatusColor(bill.status).withOpacity(0.3)),
+                    ),
+                    child: Text(_getStatusLabel(bill.status),
+                        style: GoogleFonts.inter(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: _getStatusColor(bill.status))),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              const Divider(color: AppTheme.divider),
+              const SizedBox(height: 16),
+
+              // Total Amount
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('Total Amount',
+                      style: GoogleFonts.inter(
+                          fontSize: 14, color: AppTheme.textMedium)),
+                  Text(_fmt.format(bill.totalAmount),
+                      style: GoogleFonts.inter(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.textDark)),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // Expense Breakdown (if available)
+              if (bill.expenseBreakdown != null &&
+                  bill.expenseBreakdown!.isNotEmpty) ...[
+                Text('Expense Breakdown',
+                    style: GoogleFonts.inter(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.textDark)),
+                const SizedBox(height: 12),
+                ...bill.expenseBreakdown!.entries.map((entry) => Container(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppTheme.background,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppTheme.divider),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                width: 8,
+                                height: 8,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: _getExpenseCategoryColor(entry.key),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Text(entry.key,
+                                  style: GoogleFonts.inter(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppTheme.textDark)),
+                            ],
+                          ),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(_fmt.format(entry.value),
+                                  style: GoogleFonts.inter(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppTheme.textDark)),
+                              Text(
+                                  '${((entry.value / bill.totalAmount) * 100).toStringAsFixed(1)}%',
+                                  style: GoogleFonts.inter(
+                                      fontSize: 11,
+                                      color: AppTheme.textMedium)),
+                            ],
+                          ),
+                        ],
+                      ),
+                    )),
+                const SizedBox(height: 16),
+                const Divider(color: AppTheme.divider),
+                const SizedBox(height: 16),
+              ],
+
+              // Members Section
+              Text('Members & Payments',
+                  style: GoogleFonts.inter(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.textDark)),
+              const SizedBox(height: 12),
+              ...bill.members.map((m) => Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppTheme.background,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppTheme.divider),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: m.hasPaid
+                                ? AppTheme.successGreen
+                                : AppTheme.divider,
+                          ),
+                          child: Center(
+                            child: Text(m.name[0].toUpperCase(),
+                                style: GoogleFonts.inter(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700,
+                                    color: m.hasPaid
+                                        ? Colors.white
+                                        : AppTheme.textLight)),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(m.name,
+                                  style: GoogleFonts.inter(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppTheme.textDark)),
+                              const SizedBox(height: 2),
+                              Text(
+                                  m.hasPaid
+                                      ? 'Payment Complete'
+                                      : 'Awaiting Payment',
+                                  style: GoogleFonts.inter(
+                                      fontSize: 11,
+                                      color: m.hasPaid
+                                          ? AppTheme.successGreen
+                                          : AppTheme.errorRed,
+                                      fontWeight: FontWeight.w500)),
+                            ],
+                          ),
+                        ),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text('₹${m.share.toStringAsFixed(0)}',
+                                style: GoogleFonts.inter(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppTheme.textDark)),
+                            const SizedBox(height: 2),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: m.hasPaid
+                                    ? AppTheme.successGreen.withOpacity(0.1)
+                                    : AppTheme.errorRed.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(m.hasPaid ? '✓ Paid' : 'Pending',
+                                  style: GoogleFonts.inter(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w600,
+                                      color: m.hasPaid
+                                          ? AppTheme.successGreen
+                                          : AppTheme.errorRed)),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  )),
+              const SizedBox(height: 24),
+
+              // Action Buttons
+              Row(
+                children: [
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () {
+                        Navigator.pop(context);
+                        _showEditSplitDialog(bill, billIndex);
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                              color: AppTheme.primaryPurple, width: 2),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.edit_rounded,
+                                color: AppTheme.primaryPurple, size: 18),
+                            const SizedBox(width: 6),
+                            Text('Edit',
+                                style: GoogleFonts.inter(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppTheme.primaryPurple)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () {
+                        Navigator.pop(context);
+                        showDialog(
+                          context: context,
+                          builder: (context) => AlertDialog(
+                            title: const Text('Delete Split Bill?'),
+                            content:
+                                const Text('This action cannot be undone.'),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(context),
+                                child: const Text('Cancel'),
+                              ),
+                              TextButton(
+                                onPressed: () {
+                                  Navigator.pop(context);
+                                  setState(() {
+                                    _bills.removeAt(billIndex);
+                                  });
+                                },
+                                child: const Text('Delete',
+                                    style: TextStyle(color: Colors.red)),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        decoration: BoxDecoration(
+                          color: AppTheme.errorRed.withOpacity(0.1),
+                          border:
+                              Border.all(color: AppTheme.errorRed, width: 2),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.delete_rounded,
+                                color: AppTheme.errorRed, size: 18),
+                            const SizedBox(width: 6),
+                            Text('Delete',
+                                style: GoogleFonts.inter(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppTheme.errorRed)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primaryPurple,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                    elevation: 0,
+                  ),
+                  child: Text('Close',
+                      style: GoogleFonts.inter(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Color _getStatusColor(SplitStatus status) {
+    switch (status) {
+      case SplitStatus.settled:
+        return AppTheme.successGreen;
+      case SplitStatus.partial:
+        return AppTheme.warningOrange;
+      case SplitStatus.pending:
+        return AppTheme.errorRed;
+    }
+  }
+
+  String _getStatusLabel(SplitStatus status) {
+    switch (status) {
+      case SplitStatus.settled:
+        return 'Settled';
+      case SplitStatus.partial:
+        return 'Partial';
+      case SplitStatus.pending:
+        return 'Pending';
+    }
+  }
+
+  Color _getExpenseCategoryColor(String category) {
+    switch (category.toLowerCase()) {
+      case 'hotel':
+        return const Color(0xFF5B8DEF);
+      case 'food':
+        return const Color(0xFFFFA500);
+      case 'activities':
+        return const Color(0xFFE91E63);
+      case 'transport':
+        return const Color(0xFF4CAF50);
+      case 'entertainment':
+        return const Color(0xFF9C27B0);
+      default:
+        return AppTheme.primaryPurple;
+    }
+  }
 }
 
 class _AddSplitBottomSheet extends StatefulWidget {
   final Function(String title, double amount, List<SplitMember> members) onAdd;
+  final SplitBill? initialBill;
 
-  const _AddSplitBottomSheet({required this.onAdd});
+  const _AddSplitBottomSheet({required this.onAdd, this.initialBill});
 
   @override
   State<_AddSplitBottomSheet> createState() => _AddSplitBottomSheetState();
 }
 
 class _AddSplitBottomSheetState extends State<_AddSplitBottomSheet> {
-  final _titleController = TextEditingController();
-  final _amountController = TextEditingController();
+  late final TextEditingController _titleController;
+  late final TextEditingController _amountController;
 
   final _friendNameController = TextEditingController();
   final _friendAmountController = TextEditingController();
 
-  final List<SplitMember> _members = [];
+  late final List<SplitMember> _members;
+
+  @override
+  void initState() {
+    super.initState();
+    _titleController =
+        TextEditingController(text: widget.initialBill?.title ?? '');
+    _amountController = TextEditingController(
+        text: widget.initialBill != null
+            ? widget.initialBill!.totalAmount.toStringAsFixed(0)
+            : '');
+
+    // If we're editing, populate members excluding 'You' since 'You' is automatically calculated
+    if (widget.initialBill != null) {
+      _members = widget.initialBill!.members
+          .where((m) => m.name != 'You')
+          .map((m) => SplitMember(
+                id: m.id,
+                name: m.name,
+                share: m.share,
+                hasPaid: m.hasPaid,
+                avatarUrl: m.avatarUrl,
+                upiId: m.upiId,
+              ))
+          .toList();
+    } else {
+      _members = [];
+    }
+  }
 
   @override
   void dispose() {
