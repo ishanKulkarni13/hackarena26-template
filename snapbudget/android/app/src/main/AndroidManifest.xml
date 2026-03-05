@@ -8,6 +8,8 @@
         android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="28" />
+    <!-- Voice Transaction Entry -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
     <application
         android:label="snapbudget"
