@@ -28,11 +28,13 @@ class FirestoreService {
   Stream<List<tm.Transaction>> getTransactions(String userId) => _db
       .collection('transactions')
       .where('userId', isEqualTo: userId)
-      .orderBy('date', descending: true)
+      // No orderBy here — avoids needing a composite Firestore index.
+      // Sorting is done in Dart after the documents arrive.
       .snapshots()
       .map((snap) => snap.docs
           .map((doc) => tm.Transaction.fromMap(doc.data(), doc.id))
-          .toList());
+          .toList()
+            ..sort((a, b) => b.date.compareTo(a.date)));
 
   // --- RECEIPTS ---
   Future<void> addReceipt(ReceiptModel receipt) =>

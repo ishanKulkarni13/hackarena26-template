@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
+import '../../providers/auth_provider.dart';
+import '../../providers/transaction_provider.dart';
 import '../../theme/app_theme.dart';
 import '../home/home_screen.dart';
 import '../scan/scan_screen.dart';
@@ -39,6 +42,17 @@ class _MainNavScreenState extends State<MainNavScreen>
       const AnalyticsScreen(),
       const ProfileScreen(),
     ];
+
+    // Kick off the Firestore stream once providers are available
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final userId = context.read<AuthProvider>().user?.uid ?? '';
+      if (userId.isNotEmpty) {
+        debugPrint('🔥 [MainNav] Starting transaction stream for userId: $userId');
+        context.read<TransactionProvider>().loadTransactions(userId);
+      } else {
+        debugPrint('⚠️ [MainNav] No user — skipping loadTransactions');
+      }
+    });
   }
 
   @override

@@ -9,12 +9,9 @@ list(APPEND FLUTTER_PLUGIN_LIST
   firebase_core
   firebase_storage
   permission_handler_windows
-<<<<<<< HEAD
-  speech_to_text_windows
-=======
   share_plus
+  speech_to_text_windows
   url_launcher_windows
->>>>>>> 4a1dfc0fb108d79419c74c610fd5c583fea8f38f
 )
 
 list(APPEND FLUTTER_FFI_PLUGIN_LIST

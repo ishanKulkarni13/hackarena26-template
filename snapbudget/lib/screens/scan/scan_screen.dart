@@ -204,6 +204,7 @@ class _ScanScreenState extends State<ScanScreen>
 
     final user = context.read<AuthProvider>().user;
     final userId = user?.uid ?? '';
+    debugPrint('🔑 [ScanScreen] userId for receipt save: "$userId"');
 
     await showModalBottomSheet(
       context: context,
@@ -212,27 +213,7 @@ class _ScanScreenState extends State<ScanScreen>
       builder: (ctx) => ReceiptConfirmSheet(
         result: result,
         userId: userId,
-        onSave: (Transaction tx) {
-          context.read<TransactionProvider>().addTransaction(tx);
-
-          debugPrint(
-            '✅ Receipt saved: ${tx.title} | ₹${tx.amount} | ${tx.category.label}',
-          );
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                '${tx.title} — ₹${tx.amount.toStringAsFixed(0)} added!',
-                style: GoogleFonts.inter(color: Colors.white),
-              ),
-              backgroundColor: AppTheme.successGreen,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
-              margin: const EdgeInsets.all(16),
-              duration: const Duration(seconds: 3),
-            ),
-          );
-        },
+        onSave: (Transaction tx) => _saveTransaction(tx),
       ),
     );
   }
@@ -277,6 +258,7 @@ class _ScanScreenState extends State<ScanScreen>
 
     final user = context.read<AuthProvider>().user;
     final userId = user?.uid ?? '';
+    debugPrint('🔑 [ScanScreen] userId for gallery save: "$userId"');
 
     await showModalBottomSheet(
       context: context,
@@ -285,29 +267,65 @@ class _ScanScreenState extends State<ScanScreen>
       builder: (ctx) => ReceiptConfirmSheet(
         result: result,
         userId: userId,
-        onSave: (Transaction tx) {
-          context.read<TransactionProvider>().addTransaction(tx);
-
-          debugPrint(
-            '✅ Receipt saved: ${tx.title} | ₹${tx.amount} | ${tx.category.label}',
-          );
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                '${tx.title} — ₹${tx.amount.toStringAsFixed(0)} added!',
-                style: GoogleFonts.inter(color: Colors.white),
-              ),
-              backgroundColor: AppTheme.successGreen,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
-              margin: const EdgeInsets.all(16),
-              duration: const Duration(seconds: 3),
-            ),
-          );
-        },
+        onSave: (Transaction tx) => _saveTransaction(tx),
       ),
     );
+  }
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // Shared save helper — used by camera, gallery, and voice
+  // ───────────────────────────────────────────────────────────────────────────
+
+  /// Writes [tx] to Firestore via TransactionProvider and shows a snack-bar.
+  /// This is async and fully logs every step so errors are visible in the console.
+  Future<void> _saveTransaction(Transaction tx) async {
+    debugPrint('💾 [ScanScreen] _saveTransaction called');
+    debugPrint('   id      : ${tx.id}');
+    debugPrint('   userId  : "${tx.userId}"');
+    debugPrint('   title   : ${tx.title}');
+    debugPrint('   amount  : ₹${tx.amount}');
+    debugPrint('   category: ${tx.category.name}');
+    debugPrint('   source  : ${tx.source.name}');
+
+    if (tx.userId.isEmpty) {
+      debugPrint('❌ [ScanScreen] userId is EMPTY — Firestore write will be rejected by security rules!');
+    }
+
+    try {
+      await context.read<TransactionProvider>().addTransaction(tx);
+      debugPrint('✅ [ScanScreen] Transaction written to Firestore successfully');
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '${tx.title} — ₹${tx.amount.toStringAsFixed(0)} added!',
+            style: GoogleFonts.inter(color: Colors.white),
+          ),
+          backgroundColor: AppTheme.successGreen,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          margin: const EdgeInsets.all(16),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    } catch (e, stack) {
+      debugPrint('❌ [ScanScreen] addTransaction FAILED: $e');
+      debugPrint('   Stack: $stack');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Failed to save transaction. Check console for details.',
+            style: GoogleFonts.inter(color: Colors.white),
+          ),
+          backgroundColor: AppTheme.errorRed,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          margin: const EdgeInsets.all(16),
+        ),
+      );
+    }
   }
 
   /// Toggles camera torch / flash.
