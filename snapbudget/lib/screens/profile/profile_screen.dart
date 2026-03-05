@@ -6,7 +6,6 @@ import '../../providers/auth_provider.dart';
 import '../../providers/transaction_provider.dart';
 import '../welcome/welcome_screen.dart';
 import '../budget/budget_screen.dart';
-import '../home/main_nav_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -50,7 +49,7 @@ class ProfileScreen extends StatelessWidget {
                               width: 38,
                               height: 38,
                               decoration: BoxDecoration(
-                                  color: Colors.white.withAlpha((0.15 * 255).toInt()),
+                                  color: Colors.white.withOpacity(0.15),
                                   shape: BoxShape.circle),
                               child: const Icon(Icons.edit_rounded,
                                   color: Colors.white, size: 18),
@@ -65,9 +64,9 @@ class ProfileScreen extends StatelessWidget {
                         height: 90,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: Colors.white.withAlpha((0.2 * 255).toInt()),
+                          color: Colors.white.withOpacity(0.2),
                           border: Border.all(
-                              color: Colors.white.withAlpha((0.5 * 255).toInt()), width: 3),
+                              color: Colors.white.withOpacity(0.5), width: 3),
                         ),
                         child: user?.photoURL != null
                             ? ClipRRect(
@@ -136,30 +135,14 @@ class ProfileScreen extends StatelessWidget {
                   child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceAround,
                       children: [
-                        GestureDetector(
-                          onTap: () => MainNavScreen.goToTab(context, 2), // Scan
-                          child: _quickProfileBtn(Icons.document_scanner_rounded, 'Scan', AppTheme.primaryPurple),
-                        ),
-                        GestureDetector(
-                          onTap: () => MainNavScreen.goToTab(context, 1), // SplitSync
-                          child: _quickProfileBtn(Icons.people_rounded, 'SplitSync', AppTheme.accentBlue),
-                        ),
-                        GestureDetector(
-                          onTap: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Export feature coming soon!')),
-                            );
-                          },
-                          child: _quickProfileBtn(Icons.download_rounded, 'Export', AppTheme.successGreen),
-                        ),
-                        GestureDetector(
-                          onTap: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Share feature coming soon!')),
-                            );
-                          },
-                          child: _quickProfileBtn(Icons.share_rounded, 'Share', AppTheme.warningOrange),
-                        ),
+                        _quickProfileBtn(Icons.document_scanner_rounded, 'Scan',
+                            AppTheme.primaryPurple),
+                        _quickProfileBtn(Icons.people_rounded, 'SplitSync',
+                            AppTheme.accentBlue),
+                        _quickProfileBtn(Icons.download_rounded, 'Export',
+                            AppTheme.successGreen),
+                        _quickProfileBtn(Icons.share_rounded, 'Share',
+                            AppTheme.warningOrange),
                       ]),
                 ),
               ),
@@ -225,10 +208,10 @@ class ProfileScreen extends StatelessWidget {
                     width: double.infinity,
                     height: 52,
                     decoration: BoxDecoration(
-                      color: AppTheme.errorRed.withAlpha((0.08 * 255).toInt()),
+                      color: AppTheme.errorRed.withOpacity(0.08),
                       borderRadius: BorderRadius.circular(AppTheme.radiusXL),
                       border:
-                          Border.all(color: AppTheme.errorRed.withAlpha((0.2 * 255).toInt())),
+                          Border.all(color: AppTheme.errorRed.withOpacity(0.2)),
                     ),
                     child: authProvider.isLoading
                         ? const Center(
@@ -280,7 +263,7 @@ class ProfileScreen extends StatelessWidget {
 
   Widget _vDivider() {
     return Container(
-        width: 1, height: 30, color: Colors.white.withAlpha((0.2 * 255).toInt()));
+        width: 1, height: 30, color: Colors.white.withOpacity(0.2));
   }
 
   Widget _quickProfileBtn(IconData icon, String label, Color color) {
@@ -289,7 +272,7 @@ class ProfileScreen extends StatelessWidget {
         width: 48,
         height: 48,
         decoration: BoxDecoration(
-            color: color.withAlpha((0.1 * 255).toInt()),
+            color: color.withOpacity(0.1),
             borderRadius: BorderRadius.circular(14)),
         child: Icon(icon, color: color, size: 22),
       ),
@@ -332,7 +315,7 @@ class ProfileScreen extends StatelessWidget {
           width: 40,
           height: 40,
           decoration: BoxDecoration(
-              color: color.withAlpha((0.1 * 255).toInt()),
+              color: color.withOpacity(0.1),
               borderRadius: BorderRadius.circular(12)),
           child: Icon(icon, color: color, size: 20),
         ),

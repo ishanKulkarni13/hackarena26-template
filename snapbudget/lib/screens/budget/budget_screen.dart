@@ -6,8 +6,6 @@ import '../../theme/app_theme.dart';
 import '../../models/budget_model.dart';
 import '../../providers/budget_provider.dart';
 import '../../providers/auth_provider.dart';
-import '../../providers/transaction_provider.dart';
-import '../../utils/id_utils.dart';
 
 class BudgetScreen extends StatefulWidget {
   const BudgetScreen({super.key});
@@ -37,8 +35,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
   @override
   Widget build(BuildContext context) {
     final budgetProvider = context.watch<BudgetProvider>();
-    final transactions = context.watch<TransactionProvider>().transactions;
-    final budgets = budgetProvider.budgetsWithSpend(transactions);
+    final budgets = budgetProvider.budgets;
 
     return Scaffold(
       backgroundColor: AppTheme.background,
@@ -74,7 +71,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(Icons.savings_outlined,
-              size: 80, color: AppTheme.textLight.withAlpha((0.5 * 255).toInt())),
+              size: 80, color: AppTheme.textLight.withOpacity(0.5)),
           const SizedBox(height: 16),
           Text('No Budgets Set',
               style: GoogleFonts.inter(
@@ -164,7 +161,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: color.withAlpha((0.1 * 255).toInt()),
+                  color: color.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text('${(percent * 100).toInt()}%',
@@ -360,10 +357,8 @@ class _BudgetBottomSheetState extends State<_BudgetBottomSheet> {
                   if (amount > 0) {
                     final auth = context.read<AuthProvider>();
                     final now = DateTime.now();
-                    // Generate a unique ID if adding a new budget
-                    final isNew = widget.initialBudget == null || widget.initialBudget!.budgetId.isEmpty;
                     final budget = BudgetModel(
-                      budgetId: isNew ? IdUtils.generateId() : widget.initialBudget!.budgetId,
+                      budgetId: widget.initialBudget?.budgetId ?? '',
                       userId: auth.user!.uid,
                       category: _selectedCategory,
                       monthlyLimit: amount,

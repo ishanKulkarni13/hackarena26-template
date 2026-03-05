@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 import '../models/budget_model.dart';
-import '../models/transaction_model.dart';
 import '../services/firestore_service.dart';
 
 class BudgetProvider extends ChangeNotifier {
@@ -47,29 +46,6 @@ class BudgetProvider extends ChangeNotifier {
   void _setLoading(bool value) {
     _isLoading = value;
     notifyListeners();
-  }
-
-  List<BudgetModel> budgetsWithSpend(List<Transaction> transactions) {
-    return _budgets.map((budget) {
-      final spent = transactions
-        .where((tx) =>
-          tx.type == TransactionType.expense &&
-          tx.category.name.toLowerCase() == budget.category.toLowerCase() &&
-          tx.date.month == budget.month &&
-          tx.date.year == budget.year
-        )
-        .fold(0.0, (sum, tx) => sum + tx.amount);
-
-      return BudgetModel(
-        budgetId: budget.budgetId,
-        userId: budget.userId,
-        category: budget.category,
-        monthlyLimit: budget.monthlyLimit,
-        currentSpend: spent,
-        month: budget.month,
-        year: budget.year,
-      );
-    }).toList();
   }
 
   @override

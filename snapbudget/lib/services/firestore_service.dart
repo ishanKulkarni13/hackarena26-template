@@ -81,11 +81,6 @@ class FirestoreService {
           .map((doc) => GroupExpenseModel.fromMap(doc.data(), doc.id))
           .toList());
 
-  Future<void> updateGroupExpense(GroupExpenseModel expense) => _db
-      .collection('group_expenses')
-      .doc(expense.expenseId)
-      .set(expense.toMap(), SetOptions(merge: true));
-
   // --- BUDGETS ---
   Future<void> setBudget(BudgetModel budget) =>
       _db.collection('budgets').doc(budget.budgetId).set(budget.toMap());
