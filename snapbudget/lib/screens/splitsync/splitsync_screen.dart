@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:share_plus/share_plus.dart';
+import '../../services/notification_service.dart';
 import '../../theme/app_theme.dart';
 import '../../models/split_bill_model.dart';
 import '../../providers/auth_provider.dart';
@@ -470,19 +472,47 @@ class _SplitSyncScreenState extends State<SplitSyncScreen>
                 ],
               )),
               if (balance > 0)
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                      gradient: AppTheme.primaryGradient,
-                      borderRadius: BorderRadius.circular(20)),
-                  child: Text('Remind',
-                      style: GoogleFonts.inter(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white)),
+                GestureDetector(
+                  onTap: () => _showRemindDrawer(
+                    name: friendName,
+                    amount: _fmt.format(balance),
+                    initialIndex: 1, // open "Remind My Friend" tab
+                  ),
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                        gradient: AppTheme.primaryGradient,
+                        borderRadius: BorderRadius.circular(20)),
+                    child: Text('Remind',
+                        style: GoogleFonts.inter(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white)),
+                  ),
                 )
-              else if (balance == 0)
+              else if (balance < 0)
+                GestureDetector(
+                  onTap: () => _showRemindDrawer(
+                    name: friendName,
+                    amount: _fmt.format(balance.abs()),
+                    initialIndex: 0, // open "Remind Myself" tab
+                  ),
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                        color: AppTheme.errorRed.withOpacity(0.1),
+                        border: Border.all(color: AppTheme.errorRed),
+                        borderRadius: BorderRadius.circular(20)),
+                    child: Text('Pay',
+                        style: GoogleFonts.inter(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: AppTheme.errorRed)),
+                  ),
+                )
+              else
                 Text('Settled ✅',
                     style: GoogleFonts.inter(
                         fontSize: 12,
@@ -491,6 +521,23 @@ class _SplitSyncScreenState extends State<SplitSyncScreen>
             ]),
           );
         },
+      ),
+    );
+  }
+
+  void _showRemindDrawer({
+    required String name,
+    required String amount,
+    int initialIndex = 0,
+  }) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => _RemindDrawerSheet(
+        name: name,
+        amount: amount,
+        initialIndex: initialIndex,
       ),
     );
   }
@@ -1436,6 +1483,294 @@ class _AddSplitBottomSheetState extends State<_AddSplitBottomSheet> {
           border: InputBorder.none,
           contentPadding:
               const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Reminder Drawer — "Remind Myself" and "Remind My Friend" tabs
+// ---------------------------------------------------------------------------
+class _RemindDrawerSheet extends StatefulWidget {
+  final String name;
+  final String amount;
+  final int initialIndex;
+
+  const _RemindDrawerSheet({
+    required this.name,
+    required this.amount,
+    this.initialIndex = 0,
+  });
+
+  @override
+  State<_RemindDrawerSheet> createState() => _RemindDrawerSheetState();
+}
+
+class _RemindDrawerSheetState extends State<_RemindDrawerSheet>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(
+      length: 2,
+      vsync: this,
+      initialIndex: widget.initialIndex,
+    );
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  void _scheduleReminder(int days) async {
+    final scheduledDate = DateTime.now().add(Duration(days: days));
+    await NotificationService().scheduleReminderSelf(
+      friendName: widget.name,
+      amount: widget.amount,
+      billTitle: 'SplitSync',
+      scheduledDate: scheduledDate,
+    );
+    if (mounted) {
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '🔔 Reminder set for $days day(s) from now.',
+            style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w500),
+          ),
+          backgroundColor: AppTheme.warningOrange,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      );
+    }
+  }
+
+  void _showCustomDatePicker() async {
+    final pickedDate = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now().add(const Duration(days: 1)),
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+    );
+    if (pickedDate == null || !mounted) return;
+
+    final pickedTime = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.now(),
+    );
+    if (pickedTime == null || !mounted) return;
+
+    final scheduled = DateTime(
+      pickedDate.year,
+      pickedDate.month,
+      pickedDate.day,
+      pickedTime.hour,
+      pickedTime.minute,
+    );
+
+    if (scheduled.isAfter(DateTime.now())) {
+      await NotificationService().scheduleReminderSelf(
+        friendName: widget.name,
+        amount: widget.amount,
+        billTitle: 'SplitSync',
+        scheduledDate: scheduled,
+      );
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '🔔 Custom reminder scheduled.',
+              style:
+                  GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w500),
+            ),
+            backgroundColor: AppTheme.warningOrange,
+            behavior: SnackBarBehavior.floating,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        );
+      }
+    }
+  }
+
+  void _sharePaymentRequest() {
+    final text =
+        'Hey ${widget.name}, just a friendly reminder — you owe ${widget.amount}. Let me know when you can settle up! Thanks 😊';
+    Share.share(text);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: AppTheme.cardWhite,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(height: 12),
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: AppTheme.divider,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 16),
+          TabBar(
+            controller: _tabController,
+            labelColor: AppTheme.primaryPurple,
+            unselectedLabelColor: AppTheme.textMedium,
+            indicatorColor: AppTheme.primaryPurple,
+            dividerColor: Colors.transparent,
+            labelStyle:
+                GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600),
+            tabs: const [
+              Tab(text: 'Remind Myself'),
+              Tab(text: 'Remind My Friend'),
+            ],
+          ),
+          SizedBox(
+            height: 340,
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                _buildRemindMyselfTab(),
+                _buildRemindFriendTab(),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRemindMyselfTab() {
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            "Schedule a reminder so you don't forget to pay ${widget.amount} to ${widget.name}.",
+            style: GoogleFonts.inter(fontSize: 14, color: AppTheme.textMedium),
+          ),
+          const SizedBox(height: 24),
+          _reminderOption(
+            title: 'Remind in 1 day',
+            icon: Icons.timer_rounded,
+            onTap: () => _scheduleReminder(1),
+          ),
+          const SizedBox(height: 12),
+          _reminderOption(
+            title: 'Remind in 2 days',
+            icon: Icons.access_time_filled_rounded,
+            onTap: () => _scheduleReminder(2),
+          ),
+          const SizedBox(height: 12),
+          _reminderOption(
+            title: 'Custom Time...',
+            icon: Icons.calendar_month_rounded,
+            onTap: _showCustomDatePicker,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRemindFriendTab() {
+    final msg =
+        'Hey ${widget.name}, just a friendly reminder — you owe ${widget.amount}. Let me know when you can settle up! Thanks 😊';
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Share a message to remind ${widget.name} to pay.',
+            style: GoogleFonts.inter(
+                fontSize: 14,
+                color: AppTheme.textDark,
+                fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppTheme.background,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppTheme.divider),
+            ),
+            child: Text(
+              msg,
+              style: GoogleFonts.inter(
+                  fontSize: 13,
+                  color: AppTheme.textMedium,
+                  fontStyle: FontStyle.italic),
+            ),
+          ),
+          const Spacer(),
+          GestureDetector(
+            onTap: _sharePaymentRequest,
+            child: Container(
+              width: double.infinity,
+              height: 52,
+              decoration: BoxDecoration(
+                gradient: AppTheme.primaryGradient,
+                borderRadius: BorderRadius.circular(AppTheme.radiusXL),
+              ),
+              child: Center(
+                child: Text(
+                  'Share Message via...',
+                  style: GoogleFonts.inter(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+        ],
+      ),
+    );
+  }
+
+  Widget _reminderOption({
+    required String title,
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: AppTheme.background,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppTheme.divider),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: AppTheme.primaryPurple, size: 20),
+            const SizedBox(width: 12),
+            Text(title,
+                style: GoogleFonts.inter(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.textDark)),
+            const Spacer(),
+            const Icon(Icons.chevron_right_rounded, color: AppTheme.textLight),
+          ],
         ),
       ),
     );
