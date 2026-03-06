@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import 'package:share_plus/share_plus.dart';
 import '../../services/notification_service.dart';
 import '../../theme/app_theme.dart';
 import '../../models/split_bill_model.dart';
@@ -1600,10 +1600,26 @@ class _RemindDrawerSheetState extends State<_RemindDrawerSheet>
     }
   }
 
-  void _sharePaymentRequest() {
+  void _sharePaymentRequest() async {
     final text =
         'Hey ${widget.name}, just a friendly reminder — you owe ${widget.amount}. Let me know when you can settle up! Thanks 😊';
-    Share.share(text);
+    await Clipboard.setData(ClipboardData(text: text));
+    if (mounted) {
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '📋 Message copied! Paste it to WhatsApp, SMS, etc.',
+            style:
+                GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w500),
+          ),
+          backgroundColor: AppTheme.primaryPurple,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10)),
+        ),
+      );
+    }
   }
 
   @override
@@ -1730,7 +1746,7 @@ class _RemindDrawerSheetState extends State<_RemindDrawerSheet>
               ),
               child: Center(
                 child: Text(
-                  'Share Message via...',
+                  'Copy Message to Clipboard',
                   style: GoogleFonts.inter(
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
