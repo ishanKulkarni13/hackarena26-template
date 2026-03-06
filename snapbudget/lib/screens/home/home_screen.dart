@@ -12,6 +12,7 @@ import '../transactions/add_transaction_sheet.dart';
 import '../splitsync/splitsync_screen.dart';
 import '../notifications/notifications_screen.dart';
 import '../../widgets/transaction_details_sheet.dart';
+import '../../services/gemini_receipt_service.dart';
 
 class HomeScreen extends StatefulWidget {
   /// Optional callback to switch the bottom-nav tab from within HomeScreen.
@@ -24,6 +25,23 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  String? _aiInsight;
+  bool _insightLoading = false;
+  bool _insightFetched = false;
+
+  Future<void> _fetchInsight(TransactionProvider provider) async {
+    if (_insightLoading) return;
+    setState(() => _insightLoading = true);
+    final insight = await GeminiReceiptService().generateInsight(
+      transactions: provider.transactions,
+      totalExpense: provider.totalExpense,
+      totalIncome: provider.totalIncome,
+    );
+    if (mounted) setState(() {
+      _aiInsight = insight;
+      _insightLoading = false;
+    });
+  }
   @override
   void initState() {
     super.initState();
@@ -39,6 +57,15 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     final transactionProvider = context.watch<TransactionProvider>();
+
+    // Auto-fetch insight once when transactions first load
+    if (!_insightFetched &&
+        !_insightLoading &&
+        transactionProvider.transactions.isNotEmpty) {
+      _insightFetched = true;
+      WidgetsBinding.instance.addPostFrameCallback(
+          (_) => _fetchInsight(transactionProvider));
+    }
 
     final currencyFormat = NumberFormat.currency(
       locale: 'en_IN',
@@ -66,7 +93,7 @@ class _HomeScreenState extends State<HomeScreen> {
             SliverToBoxAdapter(
                 child: _buildBalanceCard(currencyFormat, transactionProvider)),
             SliverToBoxAdapter(child: _buildQuickActions()),
-            SliverToBoxAdapter(child: _buildAIInsightCard()),
+            SliverToBoxAdapter(child: _buildAIInsightCard(transactionProvider)),
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
@@ -549,7 +576,11 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildAIInsightCard() {
+  Widget _buildAIInsightCard(TransactionProvider provider) {
+    final insightText = _insightLoading
+        ? null
+        : (_aiInsight ?? 'Tap refresh to generate your personalised AI insight.');
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
       child: Container(
@@ -593,22 +624,55 @@ class _HomeScreenState extends State<HomeScreen> {
                       color: Colors.white.withOpacity(0.7),
                     ),
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    'You spent 23% more on food this week. Try cooking at home to save ₹800.',
-                    style: GoogleFonts.inter(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.white,
+                  const SizedBox(height: 4),
+                  if (_insightLoading)
+                    Row(
+                      children: [
+                        const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white60,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Analysing your spending...',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            color: Colors.white60,
+                          ),
+                        ),
+                      ],
+                    )
+                  else
+                    Text(
+                      insightText!,
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.white,
+                      ),
                     ),
-                  ),
                 ],
               ),
             ),
-            const Icon(
-              Icons.chevron_right_rounded,
-              color: Colors.white60,
-              size: 20,
+            const SizedBox(width: 8),
+            GestureDetector(
+              onTap: _insightLoading ? null : () => _fetchInsight(provider),
+              child: Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.refresh_rounded,
+                  color: Colors.white70,
+                  size: 18,
+                ),
+              ),
             ),
           ],
         ),

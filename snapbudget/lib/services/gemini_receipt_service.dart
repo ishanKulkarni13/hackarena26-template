@@ -295,4 +295,65 @@ Respond with JSON only:
     if (start == -1 || end == -1 || end <= start) return raw;
     return raw.substring(start, end + 1);
   }
+
+  /// Generates a short, actionable financial insight based on recent transactions.
+  /// Returns a plain-text string (1–2 sentences, no markdown).
+  Future<String> generateInsight({
+    required List<Transaction> transactions,
+    required double totalExpense,
+    required double totalIncome,
+  }) async {
+    try {
+      final apiKey = dotenv.env['GEMINI_API_KEY'] ?? '';
+      if (apiKey.isEmpty) return 'Add your GEMINI_API_KEY to get AI insights.';
+
+      if (transactions.isEmpty) {
+        return 'Start adding transactions to get personalised AI insights!';
+      }
+
+      // Build a compact spend-by-category summary
+      final Map<String, double> byCategory = {};
+      for (final tx in transactions) {
+        if (tx.type == TransactionType.expense) {
+          byCategory[tx.category.name] =
+              (byCategory[tx.category.name] ?? 0) + tx.amount;
+        }
+      }
+      final topCategories = (byCategory.entries.toList()
+            ..sort((a, b) => b.value.compareTo(a.value)))
+          .take(5)
+          .map((e) => '${e.key} ₹${e.value.toStringAsFixed(0)}')
+          .join(', ');
+
+      // Recent 5 transaction titles
+      final recent = transactions
+          .take(5)
+          .map((tx) =>
+              '${tx.title} (₹${tx.amount.toStringAsFixed(0)}, ${tx.type.name})')
+          .join('; ');
+
+      final prompt = '''
+You are a personal finance advisor for an Indian user. Based on the spending data below, give exactly ONE short, specific, actionable insight in plain English. Max 20 words. No markdown, no bullet points, no asterisks. Be direct and practical.
+
+Total income: ₹${totalIncome.toStringAsFixed(0)}
+Total expenses: ₹${totalExpense.toStringAsFixed(0)}
+Top spending categories: $topCategories
+Recent transactions: $recent
+
+Reply with ONLY the insight text, nothing else.''';
+
+      final model = GenerativeModel(model: _model, apiKey: apiKey);
+      final response = await model
+          .generateContent([Content.text(prompt)])
+          .timeout(const Duration(seconds: 12));
+
+      final text = (response.text ?? '').trim();
+      if (text.isEmpty) return 'Keep tracking your expenses for better insights!';
+      // Strip any accidental asterisks or markdown
+      return text.replaceAll(RegExp(r'[*_`#]'), '').trim();
+    } catch (e, st) {
+      debugPrint('❌ [GeminiReceiptService] generateInsight error: $e\n$st');
+      return 'Could not load insight right now. Tap refresh to try again.';
+    }
+  }
 }
