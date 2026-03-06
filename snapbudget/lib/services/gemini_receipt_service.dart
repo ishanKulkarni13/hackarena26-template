@@ -95,6 +95,8 @@ class GeminiReceiptService {
       debugPrint('✅ [GeminiReceiptService] Image: ${imageBytes.length} bytes, mime: $mimeType');
 
       // ── Step 3: Send to Gemini ───────────────────────────────────────────
+      debugPrint('🤖 [GeminiReceiptService] Using model: $_model');
+      debugPrint('🔑 [GeminiReceiptService] API key length: ${apiKey.length} chars');
       final model = GenerativeModel(model: _model, apiKey: apiKey);
       final today = DateTime.now().toIso8601String().substring(0, 10);
 
@@ -188,8 +190,9 @@ Respond with JSON only:
       );
     } catch (e, stack) {
       // Print the ACTUAL exception so we know exactly what went wrong
-      debugPrint('❌ [GeminiReceiptService] EXCEPTION caught: $e');
-      debugPrint('   Stack trace:\n$stack');
+      debugPrint('❌ [GeminiReceiptService] EXCEPTION type: ${e.runtimeType}');
+      debugPrint('❌ [GeminiReceiptService] EXCEPTION message: $e');
+      debugPrint('❌ [GeminiReceiptService] Stack trace:\n$stack');
       return ReceiptParseResult.failed();
     }
   }
@@ -281,8 +284,9 @@ Respond with JSON only:
         parsedSuccessfully: true,
       );
     } catch (e, stack) {
-      debugPrint('❌ [GeminiReceiptService] Voice parse EXCEPTION: $e');
-      debugPrint('   Stack trace:\n$stack');
+      debugPrint('❌ [GeminiReceiptService] Voice parse EXCEPTION type: ${e.runtimeType}');
+      debugPrint('❌ [GeminiReceiptService] Voice parse EXCEPTION message: $e');
+      debugPrint('❌ [GeminiReceiptService] Stack trace:\n$stack');
       return ReceiptParseResult.failed();
     }
   }
@@ -352,7 +356,9 @@ Reply with ONLY the insight text, nothing else.''';
       // Strip any accidental asterisks or markdown
       return text.replaceAll(RegExp(r'[*_`#]'), '').trim();
     } catch (e, st) {
-      debugPrint('❌ [GeminiReceiptService] generateInsight error: $e\n$st');
+      debugPrint('❌ [GeminiReceiptService] generateInsight EXCEPTION type: ${e.runtimeType}');
+      debugPrint('❌ [GeminiReceiptService] generateInsight EXCEPTION message: $e');
+      debugPrint('❌ [GeminiReceiptService] Stack trace:\n$st');
       return 'Could not load insight right now. Tap refresh to try again.';
     }
   }

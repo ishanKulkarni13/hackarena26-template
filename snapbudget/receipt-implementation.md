@@ -36,7 +36,7 @@ onSave(Transaction tx) callback
 ### 1.1 Create `.env` file
 Create a file named `.env` in the **project root** (same level as `pubspec.yaml`):
 ```
-GEMINI_API_KEY=AIzaSyA9HxDO-fHzZmv79SH5VCIURdNCFexOI5o
+
 ```
 
 ### 1.2 Add `.env` to `.gitignore`
