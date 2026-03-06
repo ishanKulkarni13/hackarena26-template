@@ -21,6 +21,7 @@ class SmsParseResult {
   final TransactionCategory category;
   final double confidence;
   final String senderBank;
+  final PaymentMethod paymentMethod;
 
   const SmsParseResult({
     required this.amount,
@@ -32,6 +33,7 @@ class SmsParseResult {
     required this.category,
     required this.confidence,
     required this.senderBank,
+    required this.paymentMethod,
   });
 }
 
@@ -180,7 +182,14 @@ class SmsParserService {
     // 8. Bank name
     final senderBank = _bankNameFromSender(sender);
 
-    // 9. Confidence score
+    // 9. Payment method
+    final paymentMethod = _inferPaymentMethod(
+      sender: sender,
+      body: lower,
+      vpa: vpa,
+    );
+
+    // 10. Confidence score
     double confidence = 0.0;
     if (amount > 0) confidence += 0.4;
     if (_debitRe.hasMatch(lower) || _creditRe.hasMatch(lower)) confidence += 0.2;
@@ -200,6 +209,7 @@ class SmsParserService {
       category: category,
       confidence: confidence.clamp(0.0, 1.0),
       senderBank: senderBank,
+      paymentMethod: paymentMethod,
     );
   }
 
@@ -221,6 +231,59 @@ class SmsParserService {
       if (lower.contains(kw)) return true;
     }
     return false;
+  }
+
+  // ─── Payment method inference ──────────────────────────────────────────
+  //
+  // Priority order (highest wins):
+  //   1. VPA present                       → UPI (definitive proof)
+  //   2. "upi" keyword in body             → UPI
+  //   3. UPI app name in body or sender    → UPI  (PhonePe, GPay, BHIM, etc.)
+  //   4. "wallet" in body                  → UPI  (Indian wallets are UPI-linked)
+  //   5. Card keywords                     → card
+  //   6. NEFT / RTGS keyword               → netBanking
+  //   7. Default for bank SMS              → UPI  (most modern bank txns are UPI)
+  static PaymentMethod _inferPaymentMethod({
+    required String sender,
+    required String body,  // already lowercased
+    required String? vpa,
+  }) {
+    final s = sender.toUpperCase();
+
+    // 1. VPA is the strongest UPI signal
+    if (vpa != null && vpa.isNotEmpty) return PaymentMethod.upi;
+
+    // 2. Explicit "upi" in message body
+    if (body.contains('upi')) return PaymentMethod.upi;
+
+    // 3. UPI app keywords — body OR sender
+    final combined = '$s ${body}';
+    if (_containsAny(combined, [
+      'phonepe', 'phone pe', 'phonepay',
+      'googlepay', 'google pay', 'gpay', 'tez',
+      'bhim', 'paytm',
+      'amazon pay', 'amazonpay',
+      'mobikwik', 'freecharge', 'airtel money',
+      'cred', 'slice', 'jupiter',
+    ])) return PaymentMethod.upi;
+
+    // 4. "wallet" → UPI (digital wallets in India are overwhelmingly UPI-backed)
+    if (body.contains('wallet')) return PaymentMethod.upi;
+
+    // 5. Card signals — only if no UPI signal already detected above
+    if (_containsAny(body, [
+      'credit card', 'debit card', 'credit/debit', 'card ending',
+      'visa', 'mastercard', 'rupay', 'swipe', 'pos ',
+    ])) return PaymentMethod.card;
+
+    // 6. NEFT / RTGS = bank-to-bank net banking transfer
+    if (_containsAny(body, ['neft', 'rtgs'])) return PaymentMethod.netBanking;
+
+    // 7. IMPS can be UPI or net banking; lean UPI since it's more common
+    if (body.contains('imps')) return PaymentMethod.upi;
+
+    // Default: most modern Indian bank debit/credit SMSes are UPI
+    return PaymentMethod.upi;
   }
 
   static String _bankNameFromSender(String sender) {
@@ -352,6 +415,7 @@ class SmsParserService {
       accountLast4: result.accountLast4,
       isDebit: result.isDebit,
       category: result.category.name,
+      paymentMethod: result.paymentMethod.name,
       confidence: result.confidence,
       status: SmsStatus.pending,
       dedupeHash: dedupeHash,

@@ -18,6 +18,7 @@ class SmsTransactionModel {
   final String? accountLast4;  // Last 4 digits of account/card
   final bool isDebit;          // true = expense, false = income
   final String category;
+  final String paymentMethod;  // PaymentMethod enum name (upi, card, cash, etc.)
 
   // Confidence score 0.0–1.0
   final double confidence;
@@ -44,6 +45,7 @@ class SmsTransactionModel {
     this.accountLast4,
     required this.isDebit,
     required this.category,
+    this.paymentMethod = 'upi',
     required this.confidence,
     this.status = SmsStatus.pending,
     this.linkedTxId,
@@ -62,6 +64,7 @@ class SmsTransactionModel {
         'accountLast4': accountLast4,
         'isDebit': isDebit,
         'category': category,
+        'paymentMethod': paymentMethod,
         'confidence': confidence,
         'status': status.name,
         'linkedTxId': linkedTxId,
@@ -84,6 +87,7 @@ class SmsTransactionModel {
       accountLast4: map['accountLast4'],
       isDebit: map['isDebit'] ?? true,
       category: map['category'] ?? 'other',
+      paymentMethod: map['paymentMethod'] ?? 'upi',
       confidence: (map['confidence'] ?? 0).toDouble(),
       status: SmsStatus.values.firstWhere(
         (s) => s.name == map['status'],
@@ -111,6 +115,7 @@ class SmsTransactionModel {
         accountLast4: accountLast4,
         isDebit: isDebit,
         category: category,
+        paymentMethod: paymentMethod,
         confidence: confidence,
         status: status ?? this.status,
         linkedTxId: linkedTxId ?? this.linkedTxId,

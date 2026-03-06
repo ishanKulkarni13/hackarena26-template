@@ -437,8 +437,15 @@ class _SmsScreenState extends State<SmsScreen>
         result: parseResult,
         userId: userId,
         onSave: (Transaction tx) async {
-          // Override source to sms
-          final smsTx = tx.copyWith(source: TransactionSource.sms);
+          // Override source to sms and apply the detected payment method
+          final detectedMethod = PaymentMethod.values.firstWhere(
+            (m) => m.name == sms.paymentMethod,
+            orElse: () => PaymentMethod.upi,
+          );
+          final smsTx = tx.copyWith(
+            source: TransactionSource.sms,
+            paymentMethod: detectedMethod,
+          );
           await context.read<TransactionProvider>().addTransaction(smsTx);
 
           // Mark the SMS as accepted + link the transaction id
