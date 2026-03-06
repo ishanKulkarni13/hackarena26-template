@@ -54,11 +54,14 @@ class FirestoreService {
   Stream<List<SmsTransactionModel>> getSmsTransactions(String userId) => _db
       .collection('sms_transactions')
       .where('userId', isEqualTo: userId)
-      .orderBy('receivedAt', descending: true)
       .snapshots()
-      .map((snap) => snap.docs
-          .map((doc) => SmsTransactionModel.fromMap(doc.data(), doc.id))
-          .toList());
+      .map((snap) {
+        final list = snap.docs
+            .map((doc) => SmsTransactionModel.fromMap(doc.data(), doc.id))
+            .toList();
+        list.sort((a, b) => b.receivedAt.compareTo(a.receivedAt));
+        return list;
+      });
 
   Future<void> updateSmsStatus(
     String smsId, {
